@@ -23,7 +23,7 @@ fn main() -> eframe::Result<()> {
                 height: 64,
             }))
             .with_inner_size([1180.0, 760.0])
-            .with_min_inner_size([880.0, 580.0]),
+            .with_min_inner_size([760.0, 520.0]),
         ..Default::default()
     };
     eframe::run_native(
@@ -141,6 +141,9 @@ fn configure_style(ctx: &egui::Context) {
     visuals.selection.stroke =
         egui::Stroke::new(1.0_f32, egui::Color32::from_rgb(0x4a, 0xde, 0x80));
     visuals.hyperlink_color = egui::Color32::from_rgb(0x56, 0xb6, 0xc2);
+    // Muted grey is reserved for true secondary text: field hint /
+    // placeholder text (egui's "weak" colour), never for list content.
+    visuals.weak_text_color = Some(MUTED);
     let zero = egui::CornerRadius::ZERO;
     for w in [
         &mut visuals.widgets.noninteractive,
@@ -153,8 +156,35 @@ fn configure_style(ctx: &egui::Context) {
         w.bg_stroke = egui::Stroke::new(1.0_f32, egui::Color32::from_rgb(0x26, 0x26, 0x26));
     }
     visuals.widgets.inactive.bg_fill = egui::Color32::from_rgb(0x18, 0x18, 0x18);
-    visuals.widgets.hovered.bg_fill = egui::Color32::from_rgb(0x1a, 0x1a, 0x1a);
+    // Hover must be clearly visible (v0.1.1 used #1a1a1a, barely
+    // distinguishable from the #121212 panel); pressed gets green-dim.
+    visuals.widgets.hovered.bg_fill = egui::Color32::from_rgb(0x2a, 0x2a, 0x2a);
+    visuals.widgets.hovered.fg_stroke =
+        egui::Stroke::new(1.0_f32, egui::Color32::from_rgb(0xd0, 0xd0, 0xd0));
+    visuals.widgets.active.bg_fill = egui::Color32::from_rgb(0x1d, 0x3b, 0x27);
+    visuals.widgets.active.fg_stroke =
+        egui::Stroke::new(1.0_f32, egui::Color32::from_rgb(0x4a, 0xde, 0x80));
     ctx.set_visuals(visuals);
+    // Slightly larger base text (13 pt, top of the Terminal range) and a
+    // consistent spacing rhythm. Sizes are in egui points, so they scale
+    // together when the user zooms the UI (Ctrl and + / -).
+    ctx.style_mut(|style| {
+        style
+            .text_styles
+            .insert(egui::TextStyle::Body, egui::FontId::monospace(13.0));
+        style
+            .text_styles
+            .insert(egui::TextStyle::Button, egui::FontId::monospace(13.0));
+        style
+            .text_styles
+            .insert(egui::TextStyle::Monospace, egui::FontId::monospace(13.0));
+        style
+            .text_styles
+            .insert(egui::TextStyle::Small, egui::FontId::monospace(11.5));
+        style.spacing.item_spacing = egui::vec2(8.0, 6.0);
+        style.spacing.button_padding = egui::vec2(10.0, 5.0);
+        style.spacing.interact_size = egui::vec2(48.0, 26.0);
+    });
 }
 
 fn configure_fonts(ctx: &egui::Context) {
@@ -391,6 +421,51 @@ const GREEN: egui::Color32 = egui::Color32::from_rgb(0x4a, 0xde, 0x80);
 const MUTED: egui::Color32 = egui::Color32::from_rgb(0x7a, 0x7a, 0x7a);
 const TEXT: egui::Color32 = egui::Color32::from_rgb(0xd0, 0xd0, 0xd0);
 const RED: egui::Color32 = egui::Color32::from_rgb(0xf2, 0x6d, 0x6d);
+/// Selection background for left-column rows (Purgeon green-sel #163322).
+const SEL_BG: egui::Color32 = egui::Color32::from_rgb(0x16, 0x33, 0x22);
+/// Hover background for left-column rows — clearly visible on #121212.
+const HOVER_BG: egui::Color32 = egui::Color32::from_rgb(0x26, 0x26, 0x26);
+/// Height of one left-column list row, in points (scales with zoom).
+const ROW_H: f32 = 26.0;
+
+/// One row of the left column (a category or a calculator).
+///
+/// Readability rules (v0.1.2, measured in docs/AUDIT.md): row text is
+/// the main text colour #d0d0d0 at 13 pt — 12.15:1 against the panel,
+/// where WCAG AA asks 4.5:1. The selected row adds a green-selection
+/// background AND green text (7.87:1) AND a solid marker bar on the
+/// left edge, so selection never depends on a subtle colour change
+/// alone. Long names stay on ONE line, truncated with an ellipsis;
+/// the full name appears in a hover tooltip and in the detail header.
+fn list_row(ui: &mut egui::Ui, text: &str, selected: bool) -> bool {
+    let width = ui.available_width();
+    let (rect, resp) = ui.allocate_exact_size(egui::vec2(width, ROW_H), egui::Sense::click());
+    let painter = ui.painter();
+    if selected {
+        painter.rect_filled(rect, 0.0, SEL_BG);
+        painter.rect_filled(
+            egui::Rect::from_min_size(rect.min, egui::vec2(3.0, rect.height())),
+            0.0,
+            GREEN,
+        );
+    } else if resp.hovered() {
+        painter.rect_filled(rect, 0.0, HOVER_BG);
+    }
+    let color = if selected { GREEN } else { TEXT };
+    let inner = egui::Rect::from_min_max(
+        egui::pos2(rect.min.x + 10.0, rect.min.y + 5.0),
+        egui::pos2(rect.max.x - 6.0, rect.max.y),
+    );
+    ui.put(
+        inner,
+        egui::Label::new(egui::RichText::new(text).color(color).size(13.0))
+            .truncate()
+            .selectable(false),
+    );
+    let clicked = resp.clicked();
+    resp.on_hover_text(text);
+    clicked
+}
 
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
@@ -407,8 +482,8 @@ impl eframe::App for App {
                         "{} CALCULATORS - OFFLINE - NO ADS",
                         self.calcs.len()
                     ))
-                    .color(MUTED)
-                    .size(11.0),
+                    .color(TEXT)
+                    .size(11.5),
                 );
                 ui.separator();
                 let log_label = format!("LOG ({})", self.log_entries.len());
@@ -428,21 +503,36 @@ impl eframe::App for App {
         });
         egui::SidePanel::left("cats")
             .resizable(true)
-            .default_width(215.0)
+            .default_width(250.0)
+            .width_range(190.0..=400.0)
             .show(ctx, |ui| {
-                ui.label(egui::RichText::new("SEARCH").color(MUTED).size(11.0));
+                ui.label(
+                    egui::RichText::new("SEARCH")
+                        .color(GREEN)
+                        .strong()
+                        .size(12.0),
+                );
+                // The search box takes whatever width the (user-resizable)
+                // panel leaves after the Clear button, so it never clips
+                // when the panel is narrowed or the text is zoomed.
+                let search_w = (ui.available_width() - 70.0).max(110.0);
                 ui.horizontal(|ui| {
                     ui.add(
                         egui::TextEdit::singleline(&mut self.search)
                             .hint_text("filter calculators...")
-                            .desired_width(150.0),
+                            .desired_width(search_w),
                     );
                     if ui.button("Clear").clicked() {
                         self.search.clear();
                     }
                 });
                 ui.add_space(6.0);
-                ui.label(egui::RichText::new("CATEGORY").color(MUTED).size(11.0));
+                ui.label(
+                    egui::RichText::new("CATEGORY")
+                        .color(GREEN)
+                        .strong()
+                        .size(12.0),
+                );
                 egui::ScrollArea::vertical()
                     .id_salt("cat-scroll")
                     .max_height(180.0)
@@ -454,14 +544,19 @@ impl eframe::App for App {
                                 self.calcs.iter().filter(|c| c.category == cat).count()
                             };
                             let label = format!("{} ({})", cat.to_uppercase(), n);
-                            if ui.selectable_label(self.category == *cat, label).clicked() {
+                            if list_row(ui, &label, self.category == *cat) {
                                 self.category = cat.clone();
                             }
                         }
                     });
                 ui.add_space(6.0);
                 ui.separator();
-                ui.label(egui::RichText::new("CALCULATORS").color(MUTED).size(11.0));
+                ui.label(
+                    egui::RichText::new("CALCULATORS")
+                        .color(GREEN)
+                        .strong()
+                        .size(12.0),
+                );
                 let mut to_select: Option<usize> = None;
                 egui::ScrollArea::vertical()
                     .id_salt("calc-scroll")
@@ -470,10 +565,7 @@ impl eframe::App for App {
                             if !self.visible(c) {
                                 continue;
                             }
-                            if ui
-                                .selectable_label(self.selected == Some(i), c.name)
-                                .clicked()
-                            {
+                            if list_row(ui, c.name, self.selected == Some(i)) {
                                 to_select = Some(i);
                             }
                         }
@@ -495,7 +587,7 @@ impl eframe::App for App {
                         "{} saved calculations, newest first. Every successful calculation (window or command line) is saved here automatically. Click RE-OPEN to load an entry's calculator with its inputs restored.",
                         self.log_entries.len()
                     ))
-                    .color(MUTED),
+                    .color(TEXT),
                 );
                 ui.add_space(6.0);
                 let mut do_clear = false;
@@ -528,8 +620,8 @@ impl eframe::App for App {
                                 ui.horizontal(|ui| {
                                     ui.label(
                                         egui::RichText::new(&e.timestamp)
-                                            .color(MUTED)
-                                            .size(11.0),
+                                            .color(TEXT)
+                                            .size(11.5),
                                     );
                                     ui.label(
                                         egui::RichText::new(&e.name)
@@ -557,6 +649,14 @@ impl eframe::App for App {
                 }
                 return;
             }
+            // The whole detail pane lives in a vertical scroll area:
+            // at the minimum window size, or at 150-200% text zoom,
+            // content scrolls into reach instead of clipping or
+            // overlapping. Input rows inside use wrapping layout and
+            // widths derived from the available width (see below).
+            egui::ScrollArea::vertical()
+                .id_salt("detail-scroll")
+                .show(ui, |ui| {
             let Some(idx) = self.selected else {
                 ui.label(
                     egui::RichText::new("Pick a calculator on the left.")
@@ -565,7 +665,7 @@ impl eframe::App for App {
                 );
                 ui.label(
                     egui::RichText::new("Every calculator here also works from the command line — e.g. CalcDex compound-interest 1000 5 10 12")
-                        .color(MUTED),
+                        .color(TEXT),
                 );
                 return;
             };
@@ -585,12 +685,21 @@ impl eframe::App for App {
             ui.label(
                 egui::RichText::new(name.to_uppercase()).color(GREEN).strong().size(16.0),
             );
-            ui.label(egui::RichText::new(format!("[{category}]  id: {id}")).color(MUTED).size(11.0));
+            ui.label(egui::RichText::new(format!("[{category}]  id: {id}")).color(TEXT).size(11.5));
             ui.add_space(4.0);
             ui.label(egui::RichText::new(desc).color(TEXT));
             ui.add_space(8.0);
+            // Input rows: the label column takes 38% of the pane width
+            // (clamped 130-300 pt) and the field takes what is left
+            // (clamped 150-380 pt). Both are recomputed every frame from
+            // the actual available width, so resizing the window or the
+            // left panel, or zooming the text, reflows the rows instead
+            // of pushing fields off the right edge.
+            let avail = ui.available_width();
+            let label_w = (avail * 0.38).clamp(130.0, 300.0);
+            let field_w = (avail - label_w - 16.0).clamp(150.0, 380.0);
             if is_list {
-                ui.label(egui::RichText::new("NUMBERS (COMMA OR SPACE SEPARATED)").color(MUTED).size(11.0));
+                ui.label(egui::RichText::new("NUMBERS (COMMA OR SPACE SEPARATED)").color(TEXT).size(12.0));
                 ui.add(
                     egui::TextEdit::multiline(&mut self.list_input)
                         .desired_rows(3)
@@ -601,12 +710,12 @@ impl eframe::App for App {
                 let mut i = 0usize;
                 while i < inputs_labels.len() {
                     if let Some(g) = date_groups.iter().find(|g| g.start == i) {
-                        ui.horizontal(|ui| {
-                            ui.add_sized([300.0, 20.0], egui::Label::new(egui::RichText::new(g.label.to_uppercase()).color(MUTED).size(11.0)));
+                        ui.horizontal_wrapped(|ui| {
+                            ui.add_sized([label_w, 20.0], egui::Label::new(egui::RichText::new(g.label.to_uppercase()).color(TEXT).size(12.0)));
                             ui.add(
                                 egui::TextEdit::singleline(&mut self.date_texts[gi])
                                     .hint_text("MM/DD/YYYY")
-                                    .desired_width(180.0),
+                                    .desired_width(170.0),
                             );
                             if ui
                                 .add(egui::Button::new(egui::RichText::new("Today?").color(GREEN)))
@@ -616,17 +725,17 @@ impl eframe::App for App {
                             }
                         });
                         ui.horizontal(|ui| {
-                            ui.add_sized([300.0, 20.0], egui::Label::new(""));
-                            ui.label(egui::RichText::new(DATE_HINT).color(MUTED).size(11.0));
+                            ui.add_sized([label_w, 20.0], egui::Label::new(""));
+                            ui.label(egui::RichText::new(DATE_HINT).color(TEXT).size(11.5));
                         });
                         gi += 1;
                         i += 3;
                     } else {
                         let label = inputs_labels[i];
-                        ui.horizontal(|ui| {
-                            ui.add_sized([300.0, 20.0], egui::Label::new(egui::RichText::new(label.to_uppercase()).color(MUTED).size(11.0)));
+                        ui.horizontal_wrapped(|ui| {
+                            ui.add_sized([label_w, 20.0], egui::Label::new(egui::RichText::new(label.to_uppercase()).color(TEXT).size(12.0)));
                             ui.add(
-                                egui::TextEdit::singleline(&mut self.inputs[i]).desired_width(180.0),
+                                egui::TextEdit::singleline(&mut self.inputs[i]).desired_width(field_w),
                             );
                         });
                         i += 1;
@@ -644,16 +753,14 @@ impl eframe::App for App {
             ui.separator();
             if !self.output.is_empty() {
                 let is_error = self.output.starts_with("Error") || self.output.contains("is not a number");
-                egui::ScrollArea::vertical()
-                    .id_salt("out-scroll")
-                    .show(ui, |ui| {
-                        ui.label(
-                            egui::RichText::new(&self.output)
-                                .color(if is_error { RED } else { TEXT })
-                                .size(13.0),
-                        );
-                    });
+                ui.label(egui::RichText::new("RESULT").color(GREEN).strong().size(12.0));
+                ui.label(
+                    egui::RichText::new(&self.output)
+                        .color(if is_error { RED } else { TEXT })
+                        .size(13.0),
+                );
             }
+                });
         });
     }
 }
