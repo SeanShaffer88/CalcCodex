@@ -47,43 +47,6 @@ CLI and every result are exactly as audited at 0.1.2.
   mockup's consumer mode names and memory row do not exist in
   CalcDex; × ÷ operator keys are omitted on purpose).
 
-### Feel — SEAN's brief for this build
-
-SEAN's words (2026-10-25): the program should feel *"interactive,
-intuitive, well-organized, accessible, easy, robust, not
-cumbersome — and very polished."* How each word was honoured:
-
-- **Interactive:** keypad and keyboard input echo in the field
-  instantly; every control has hover/pressed states; Calculate
-  answers in the same frame (all arithmetic is local and instant);
-  the history rail gains the new entry the moment a run succeeds.
-- **Intuitive / easy:** the click count to a finished calculation
-  is unchanged from 0.1.2 (mode → calculator → values →
-  CALCULATE); defaults are pre-filled (Age End Date = today);
-  one obvious CALCULATE button, echoed by the keypad's `=` and by
-  Enter; every step on the path is labelled in plain words.
-- **Well-organized:** mode rail order is fixed and curated (it
-  never reshuffles), search filters as you type from the first
-  letters, and the layout is identical between sessions.
-- **Accessible:** every new colour pairing measures at or above
-  WCAG AA (docs/AUDIT.md v0.2.0 addendum: rail hints 6.66:1,
-  keypad text 11.51:1, display green 11.23:1, `=` key 7.06:1);
-  a full keyboard path exists (Alt+ mode keys, Tab through chips,
-  fields, CALCULATE and history RE-OPEN); selection is never
-  colour-alone; the 0.1.2 zoom/reflow behaviour carries over.
-- **Robust, not cumbersome:** no field content can crash the app
-  (bad input is a teaching error, from the unchanged 0.1.2 code
-  path); the keypad only ever edits the current calculator's
-  current field; panels not needed stay quiet — the history rail
-  collapses on narrow windows instead of squeezing the work area.
-- **Very polished:** a dedicated pass aligned the window on the
-  4/8 pt spacing rhythm, made the keypad an exact 4-column grid
-  at any width, designed all three empty states (no calculator
-  picked, no search matches, empty history) as framed panels
-  with a helpful line, and removed stray header clutter.
-- Honestly **Unverified**: how all of this feels and looks on a
-  real Windows machine at real sizes — SEAN's run is the verdict.
-
 ## 0.1.2 — 2026-10-25
 
 The readability + responsive + full-audit release, from SEAN's field
