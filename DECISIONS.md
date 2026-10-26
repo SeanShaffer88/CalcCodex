@@ -1,4 +1,42 @@
-# Decisions — CalcCodex
+# Decisions — CalcDex
+
+## 2026-10-25 — Renamed CalcCodex → CalcDex
+SEAN's order: "rename repo project and program to CalcDex". The rename
+applies everywhere the program/project is named: the directory
+(~/workspace/calcdex), the Cargo package (calcdex), the binary
+(CalcDex.exe), the window title/header (CALCDEX), the CLI name and help
+text, the installer, and all docs. Calculator ids (e.g.
+compound-interest) and formulas do not change. v0.1.0 was built and
+field-tested locally under the old name CalcCodex and renamed before
+any GitHub publication; the first published release is CalcDex
+v0.1.1. Historical mentions of the old name survive only in this note
+and the CHANGELOG rename note.
+
+## 2026-10-25 — Icon: option 1 (calculator outline)
+SEAN was shown a six-option icon contact sheet for CalcDex. He first
+tapped Icon 2, then immediately sent "1" as his final word — the FINAL
+pick is **Icon 1**, superseding 2. Icon 1 is the calculator-outline
+design: phosphor green (#4ade80) calculator outline with a dark-green
+display screen and a 3x3 button grid plus a wide bottom bar, on
+near-black (#0c0c0c), sharp corners. The production artwork
+(assets/icon.ico, 16–256 px, plus assets/icon-64.rgba for the window)
+was redrawn cleanly from the concept — the concept sheet's overlap
+glitch, where the wide bottom row crossed the third button row, was
+fixed with even spacing. The icon is wired into the window/taskbar
+(eframe with_icon), the .exe resource itself (build.rs + windres,
+.rsrc section), and the NSIS installer/uninstaller.
+
+## 2026-10-25 — Smarter dates + calculation log (v0.1.1)
+From SEAN's field test of v0.1.0: date entry as separate year/month/
+day boxes with "On year" wording was odd. Decided: one MM/DD/YYYY box
+per date (explicit date-group metadata on the registry, internal
+numeric triples unchanged), a plain-words format hint, a "Today?"
+button beside every date field (Age End Date and Countdown From Date
+pre-filled), the CLI accepts a date as one MM/DD/YYYY argument (the
+six-number form still works identically), and a persistent
+calculation log shared by GUI and CLI (%APPDATA%\CalcDex\history.txt,
+500-entry cap, --log / --clear-log, click-to-restore in the GUI).
+
 
 ## 2026-10-25 — Audience: academic + professional first
 SEAN: "keep in mind the kind of people who will be using this program
@@ -31,7 +69,7 @@ Howard Hinnant's published days-from-civil algorithm and tested).
 ## 2026-10-25 — Parametric collapsing (counting honesty)
 Omni lists a separate page per unit pair and per ingredient; Nutilz
 lists a separate tool per image/PDF format pair (out of scope here).
-CalcCodex registers ONE converter per dimension with the units as
+CalcDex registers ONE converter per dimension with the units as
 numbered inputs, and one grams↔cups calculator per ingredient with
 its published density. The registry count is the count of these real
 registered calculators — no inflated per-pair counting in either

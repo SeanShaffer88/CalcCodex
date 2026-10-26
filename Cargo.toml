@@ -1,20 +1,20 @@
 [package]
-name = "calccodex"
-version = "0.1.0"
+name = "calcdex"
+version = "0.1.1"
 edition = "2021"
 rust-version = "1.80"
 authors = ["Sean Shaffer"]
-description = "CalcCodex — the ultimate offline calculator: every kind of calculation from Omni Calculator and the Nutilz calculator set, in one Windows program."
+description = "CalcDex — the ultimate offline calculator: every kind of calculation from Omni Calculator and the Nutilz calculator set, in one Windows program."
 license = "MIT"
 keywords = ["windows", "calculator", "math", "finance", "converter"]
 categories = ["gui"]
 
 [lib]
-name = "calccodex"
+name = "calcdex"
 path = "src/lib.rs"
 
 [[bin]]
-name = "CalcCodex"
+name = "CalcDex"
 path = "src/main.rs"
 
 [dependencies]

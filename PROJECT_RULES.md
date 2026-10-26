@@ -1,4 +1,4 @@
-# CalcCodex — Project Rules
+# CalcDex — Project Rules
 
 Prompt in force: The Elite Software Master Prompt v1.1 · Annexes: A (desktop/Windows), B (Storytold orchestration), C (SEAN defaults)
 Purpose in one line: The ultimate offline calculator — every kind of calculation from Omni Calculator + the Nutilz calculator subset, one registry behind a Terminal-themed Windows app.

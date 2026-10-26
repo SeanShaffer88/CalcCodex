@@ -1,8 +1,8 @@
-# CalcCodex
+# CalcDex
 
 ## TL;DR
 
-CalcCodex is one free program for Windows that does almost every kind of
+CalcDex is one free program for Windows that does almost every kind of
 calculation in one place — like having a big box of hundreds of different
 calculators (for money, health, school maths, building jobs, cooking,
 sports, and much more) that all work with no internet, no ads, and no
@@ -15,7 +15,7 @@ never unlock anything. No ads, no in-app purchases, no selling data.
 
 ## Who it is for
 
-CalcCodex is built for **students, teachers, professors, scientists
+CalcDex is built for **students, teachers, professors, scientists
 and engineers** — people who need a result they can check, not just a
 number. That is why every calculator:
 
@@ -42,11 +42,11 @@ with identical output.
 
 ## What it does
 
-CalcCodex brings together the calculator sets of two big websites —
+CalcDex brings together the calculator sets of two big websites —
 Omni Calculator (3,938 calculators) and Nutilz (637+ tools, calculator
 subset only) — as one offline desktop program. Where those sites list
 hundreds of near-identical pages (for example a separate page for every
-unit pair), CalcCodex uses one calculator where you pick the units —
+unit pair), CalcDex uses one calculator where you pick the units —
 see `docs/COVERAGE.md` for the honest mapping.
 
 Categories: Math, Finance, Health, Physics, Chemistry, Construction,
@@ -65,11 +65,16 @@ accent `#4ade80`, Cascadia Mono type, sharp corners everywhere.
 
 ## How to use it (window)
 
-1. Run `CalcCodex.exe`.
+1. Run `CalcDex.exe`.
 2. Type in the Search box (or pick a Category) on the left.
 3. Click a calculator.
-4. Fill in the labelled number boxes (list calculators take numbers
-   separated by commas or spaces in one big box).
+4. Fill in the labelled boxes (list calculators take numbers
+   separated by commas or spaces in one big box). Dates go in ONE
+   box per date, in the format the hint under the box shows —
+   MM/DD/YYYY, so 04/23/1988 means April 23, 1988. Press the green
+   **Today?** button beside any date box to fill in today's date
+   (the Age calculator's End Date and the Countdown's From Date
+   already start filled with today).
 5. Press CALCULATE and read the result, with the formula and steps.
 
 ## How to use it (command line)
@@ -78,18 +83,40 @@ Every calculator works the same from the command line — nothing is
 window-only:
 
 ```
-CalcCodex --list
-CalcCodex --search loan
-CalcCodex compound-interest 1000 5 10
-CalcCodex bmi 70 175
-CalcCodex mean 1 2 3 4
-CalcCodex convert-length 1 7 3
+CalcDex --list
+CalcDex --search loan
+CalcDex compound-interest 1000 5 10
+CalcDex bmi 70 175
+CalcDex mean 1 2 3 4
+CalcDex convert-length 1 7 3
+CalcDex age 04/23/1988 10/25/2026
 ```
+
+Dates on the command line are one argument in MM/DD/YYYY form, just
+like the window (the old six-number form `1988 4 23 2026 10 25`
+still works and gives the identical answer).
 
 Numbers go in the same order as the labelled boxes in the window.
 For unit converters the two extra numbers pick the units from the
 numbered list shown in that calculator's description.
-`CalcCodex --help` explains the rest.
+`CalcDex --help` explains the rest.
+
+## Calculation log
+
+Every successful calculation is saved automatically — whether you
+ran it in the window or on the command line — so classwork, lab
+results and estimates (SEAN's original request was for age
+calculations) can be found again later:
+
+- Press **LOG** in the window's header to see the saved entries,
+  newest first. **RE-OPEN** on an entry loads that calculator with
+  its inputs restored; **CLEAR LOG** empties the log.
+- Or from the command line: `CalcDex --log` prints the log and
+  `CalcDex --clear-log` empties it.
+- Entries are kept in `%APPDATA%\CalcDex\history.txt` (plain text:
+  time, calculator, inputs — dates in MM/DD/YYYY form — and result).
+  Only the newest 500 entries are kept; log timestamps are UTC.
+  Failed calculations are never logged.
 
 ## Requirements & building
 
@@ -103,8 +130,8 @@ numbered list shown in that calculator's description.
 
 Releases carry exactly two files, as always:
 
-1. `CalcCodex-Setup-0.1.0.exe` — the installer (per-user, no admin).
-2. `CalcCodex-0.1.0-portable.zip` — the portable build: just the .exe
+1. `CalcDex-Setup-0.1.1.exe` — the installer (per-user, no admin).
+2. `CalcDex-0.1.1-portable.zip` — the portable build: just the .exe
    plus the license and a short note. Unzip and run.
 
 The program is unsigned (no code-signing certificate) — Windows may
@@ -113,8 +140,10 @@ this build. Check the SHA-256 in the release notes to be sure.
 
 ## Screenshots
 
-To be confirmed — real captures from SEAN's machine will be added
-after his first run. (No placeholder pictures, ever.)
+To be confirmed — v0.1.0 was field-verified on SEAN's machine, and
+fresh real captures from SEAN's machine are needed for v0.1.1: the
+Age calculator with a merged Birth Date / End Date field, and the
+Calculation Log view. (No placeholder pictures, ever.)
 
 ## Limitations (honest)
 
