@@ -104,3 +104,63 @@ future layout (2026-10-25). The redesign is its own slice AFTER
 v0.1.2 — v0.1.2 deliberately keeps the current layout and only
 carries the readability / contrast / responsive work, which is
 written generally so it carries forward into Design 3.
+
+## 2026-10-25 — v0.2.0: Design 3 built (layout decisions + brief)
+
+SEAN's design brief for this build, verbatim (2026-10-25):
+"CalcDex should feel interactive, intuitive, well-organized,
+accessible, easy, robust, not cumbersome — and very polished."
+The eight words were treated as acceptance criteria; the CHANGELOG /
+README "Feel" section records how each was honoured and what is
+still Unverified (SEAN's on-Windows run is the verdict).
+
+Layout decisions taken while building Design 3:
+
+- **Modes are the categories.** The mockup's rail lists a consumer
+  calculator's six modes (Standard, Scientific, Graphing,
+  Programmer, Date Calculation, Converters). CalcDex has no such
+  modes — its organisation IS its 14 categories — so the rail lists
+  All + the 14 categories as modes in a curated order (not
+  alphabetical), with short labels (CHEM, STATS, CONVERT, BUILD,
+  DATE, DAILY…) and the full name + count in the row tooltip.
+- **Shortcut set:** Alt+1..Alt+9, Alt+0 for the first ten modes,
+  Alt+Q/W/E/R/T for the remaining five, in rail order. Only these
+  are printed (on the rail rows and in the README), and only these
+  are implemented. Mode rows are click targets; the keyboard path
+  to a mode is its Alt+ key (everything after that — chips, fields,
+  CALCULATE, RE-OPEN — is Tab-reachable egui widgets).
+- **The mockup's memory row (MC/MR/M+/M-/MS) is omitted.**
+  CalcDex's memory is the persistent calculation log / history
+  rail: results are saved automatically and re-open with inputs
+  restored, which does the job a register memory does on the
+  reference app, in the way this program already worked.
+- **Operator keys × ÷ are omitted from the keypad on purpose.**
+  CalcDex fields take single values, not expressions; a × or ÷
+  keypress would put a character in the field that cannot parse
+  and would only produce an error. Sign is the +/− key; `/` appears
+  for date fields and `,` for list fields (the separator each
+  field actually uses); `=` is Calculate.
+- **The mockup shows a category list under the modes in the rail.**
+  Ours are the same list (modes ARE categories), so there is no
+  second list — one navigation system, nothing duplicated.
+- **Click counts did not grow vs v0.1.2.** Pick a result:
+  mode click (or Alt+key, or none — All is default) → calculator
+  click → type/pad the fields → CALCULATE. Identical count to
+  v0.1.2's category → calculator → CALCULATE, and the keypad adds
+  a mouse-only path that did not exist before. Search is the same
+  box, still filtering as you type.
+- **History collapse threshold: 1100 pt window width** (content
+  rect). At/above it, LOG docks/undocks the right rail; below it,
+  LOG switches the centre to the log view (the v0.1.x behaviour),
+  so history is reachable at every size including the 760 pt
+  minimum. LOG starts shown, as in the mockup.
+- **Keypad target safety:** the pad edits only the string of the
+  field last clicked/focused on the currently selected calculator
+  (falling back to that calculator's first field). Fields are
+  per-selection state and are reset when a calculator is picked,
+  so pad input can never land in another calculator's saved or
+  logged state; the log only ever records Calculate runs.
+- **Display headline:** the display shows the result's first line
+  at 24 pt; the complete output (formula, substituted values,
+  result) is duplicated verbatim into the STEPS / FULL RESULT
+  footer — the design's "steps footer" — so nothing is truncated.
