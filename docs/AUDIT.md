@@ -248,3 +248,34 @@ what the row prints.
 collapse behaviour at real window sizes) is **Partially Verified**
 — construction + code review + the measured ratios above; SEAN's
 run is the remaining verdict, as with v0.1.2.
+
+## v0.3.0 addendum — smart defaults (#50) and Batch 1 audit notes
+
+Defaults policy: every field opens on its teaching-example value
+(meta::EXAMPLES) unless meta::DEFAULT_OVERRIDES overrides it, so
+defaults are values the audit corpus already runs. Notable
+defaults and their sources:
+
+- **Dates:** Age End Date and Countdown From Date open on TODAY
+  (system clock, set at select time); other date fields open on
+  the example date so the format is visible in place.
+- **Gas laws:** STP discipline standard — 273.15 K, 1 atm,
+  22.414 L (molar volume at STP), 1 mol.
+- **Gravity:** g = 9.80665 m/s² (standard gravity, BIPM) — a named
+  constant inside the physics formulas, not an input; pendulum
+  and free-fall open on everyday values (1 m, 2 s).
+- **Finance:** 5% / 10 years teaching values; z* fields open on
+  1.96 (95% level); proportion p fields on 0.5 (the safest /
+  largest-sample assumption, as the labels state).
+- **Percent fields:** realistic mid values (tip 15–20%, discounts
+  10–20%); split/count fields open on small whole numbers.
+- Every default is VISIBLE in its field and editable — no hidden
+  magic state; RESET restores exactly these values.
+
+Batch 1 self-audit: examples for all 300 calculators were run by
+the registry-wide test (any example that errors fails the gate);
+the regression calculator's vectors come from a textbook dataset
+computed by hand (m = 0.6, b = 2.2, r = 0.7746, R² = 0.6); the CSV
+parser has quoted-comma cases in tests. GUI panels are
+construction-verified only — on-Windows behaviour is Unverified
+until a field run, same label as v0.2.0.
