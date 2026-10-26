@@ -5,7 +5,7 @@
 
 use calcdex::{
     all_calcs, append_history, clear_history, date_group_at, expand_args, load_history, make_entry,
-    run_calc, today_str, Calc, LogEntry, DATE_HINT,
+    pad_apply, pad_key_allowed, run_calc, today_str, Calc, FieldKind, LogEntry, PadKey, DATE_HINT,
 };
 use std::collections::BTreeSet;
 
@@ -224,10 +224,128 @@ fn configure_fonts(ctx: &egui::Context) {
 }
 
 // ---------- App ----------
+//
+// v0.2.0 layout — Design 3 (SEAN's pick from the 8 research mockups,
+// Microsoft-Calculator-inspired):
+//   * a slim MODE RAIL on the far left: the categories are the modes,
+//     each with its Alt+ shortcut hint, plus the search box on top;
+//   * the CENTRE: a chip strip of the active mode's calculators, the
+//     selected calculator's form, a prominent DISPLAY for the result,
+//     a big on-screen KEYPAD, and the worked steps as a footer block;
+//   * a HISTORY rail docked on the right (the calculation log), which
+//     collapses below the width threshold documented at
+//     `HISTORY_RAIL_MIN_WIDTH` — there the header LOG toggle switches
+//     the centre to the log view instead, as it did in v0.1.x.
+
+/// One mode-rail entry: a category (or "All") as a mode.
+struct Mode {
+    /// Full category name ("All" or e.g. "Date & Time").
+    name: String,
+    /// Short label shown in the slim rail.
+    short: &'static str,
+    /// Shortcut hint printed on the row, e.g. "Alt+1".
+    hint: String,
+    /// The key that, with Alt held, selects this mode.
+    key: egui::Key,
+}
+
+/// Curated mode order (the registry's own presentation order, not
+/// alphabetical): general first, then the school/university subjects,
+/// then the applied sets.
+const MODE_ORDER: &[(&str, &str)] = &[
+    ("All", "ALL"),
+    ("Math", "MATH"),
+    ("Finance", "FINANCE"),
+    ("Health", "HEALTH"),
+    ("Physics", "PHYSICS"),
+    ("Chemistry", "CHEM"),
+    ("Statistics", "STATS"),
+    ("Conversion", "CONVERT"),
+    ("Construction", "BUILD"),
+    ("Date & Time", "DATE"),
+    ("Everyday", "DAILY"),
+    ("Sports", "SPORTS"),
+    ("Food", "FOOD"),
+    ("Ecology", "ECOLOGY"),
+    ("Other", "OTHER"),
+];
+
+/// Alt+ keys in mode order: digits first (1..9, 0), then Q W E R T —
+/// fifteen modes total. These are the hints printed on the rail, and
+/// they are the set the handler below implements — nothing else is
+/// printed anywhere.
+const MODE_KEYS: &[egui::Key] = &[
+    egui::Key::Num1,
+    egui::Key::Num2,
+    egui::Key::Num3,
+    egui::Key::Num4,
+    egui::Key::Num5,
+    egui::Key::Num6,
+    egui::Key::Num7,
+    egui::Key::Num8,
+    egui::Key::Num9,
+    egui::Key::Num0,
+    egui::Key::Q,
+    egui::Key::W,
+    egui::Key::E,
+    egui::Key::R,
+    egui::Key::T,
+];
+
+fn mode_hint(key: egui::Key) -> String {
+    let name = match key {
+        egui::Key::Num0 => "0",
+        egui::Key::Num1 => "1",
+        egui::Key::Num2 => "2",
+        egui::Key::Num3 => "3",
+        egui::Key::Num4 => "4",
+        egui::Key::Num5 => "5",
+        egui::Key::Num6 => "6",
+        egui::Key::Num7 => "7",
+        egui::Key::Num8 => "8",
+        egui::Key::Num9 => "9",
+        egui::Key::Q => "Q",
+        egui::Key::W => "W",
+        egui::Key::E => "E",
+        egui::Key::R => "R",
+        egui::Key::T => "T",
+        _ => "?",
+    };
+    format!("Alt+{name}")
+}
+
+fn build_modes(present: &BTreeSet<String>) -> Vec<Mode> {
+    let mut modes = Vec::new();
+    let mut keys = MODE_KEYS.iter();
+    for (name, short) in MODE_ORDER {
+        if *name != "All" && !present.contains(*name) {
+            continue;
+        }
+        let Some(key) = keys.next() else { break };
+        modes.push(Mode {
+            name: name.to_string(),
+            short,
+            hint: mode_hint(*key),
+            key: *key,
+        });
+    }
+    modes
+}
+
+/// Which input field the on-screen keypad currently targets.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum FieldRef {
+    /// Index into the calculator's labelled inputs.
+    Input(usize),
+    /// Index into the calculator's date groups.
+    Date(usize),
+    /// The single list-input field of a list calculator.
+    List,
+}
 
 struct App {
     calcs: Vec<Calc>,
-    categories: Vec<String>,
+    modes: Vec<Mode>,
     category: String, // "All" or a category name
     search: String,
     selected: Option<usize>, // index into calcs
@@ -236,8 +354,14 @@ struct App {
     date_texts: Vec<String>,
     list_input: String,
     output: String,
+    /// History rail visible (wide windows) / log view shown (narrow).
     show_log: bool,
     log_entries: Vec<LogEntry>,
+    /// Last field the user clicked or typed in (keypad target).
+    focus: Option<FieldRef>,
+    /// After a keypad press, give keyboard focus back to the target
+    /// field on the next frame so typing and the pad interleave.
+    refocus: bool,
 }
 
 impl App {
@@ -247,11 +371,9 @@ impl App {
         for c in &calcs {
             set.insert(c.category.to_string());
         }
-        let mut categories = vec!["All".to_string()];
-        categories.extend(set);
         App {
+            modes: build_modes(&set),
             calcs,
-            categories,
             category: "All".to_string(),
             search: String::new(),
             selected: None,
@@ -259,8 +381,10 @@ impl App {
             date_texts: Vec::new(),
             list_input: String::new(),
             output: String::new(),
-            show_log: false,
+            show_log: true,
             log_entries: load_history(),
+            focus: None,
+            refocus: false,
         }
     }
 
@@ -269,7 +393,8 @@ impl App {
         self.inputs = vec![String::new(); self.calcs[idx].inputs.len()];
         self.list_input.clear();
         self.output.clear();
-        self.show_log = false;
+        self.focus = None;
+        self.refocus = false;
         // One merged text field per date group.
         self.date_texts = vec![String::new(); self.calcs[idx].date_groups.len()];
         // Sensible defaults: the Age calculator's End Date and the
@@ -340,6 +465,73 @@ impl App {
             || c.desc.to_lowercase().contains(&q)
     }
 
+    /// The field the keypad will type into: the last field the user
+    /// touched, if it still exists on the selected calculator, else
+    /// the calculator's first field.
+    fn effective_focus(&self) -> Option<FieldRef> {
+        let idx = self.selected?;
+        let calc = &self.calcs[idx];
+        if calc.list {
+            return Some(FieldRef::List);
+        }
+        if let Some(f) = self.focus {
+            let ok = match f {
+                FieldRef::List => false,
+                FieldRef::Date(gi) => gi < calc.date_groups.len(),
+                FieldRef::Input(i) => {
+                    i < calc.inputs.len()
+                        && date_group_at(calc, i).is_none()
+                        && !calc
+                            .date_groups
+                            .iter()
+                            .any(|g| i > g.start && i < g.start + 3)
+                }
+            };
+            if ok {
+                return Some(f);
+            }
+        }
+        if date_group_at(calc, 0).is_some() {
+            Some(FieldRef::Date(0))
+        } else if calc.inputs.is_empty() {
+            None
+        } else {
+            Some(FieldRef::Input(0))
+        }
+    }
+
+    fn focus_kind(&self) -> FieldKind {
+        match self.effective_focus() {
+            Some(FieldRef::Date(_)) => FieldKind::Date,
+            Some(FieldRef::List) => FieldKind::List,
+            _ => FieldKind::Numeric,
+        }
+    }
+
+    /// Apply one on-screen keypad press to the target field's text.
+    fn pad_press(&mut self, key: PadKey) {
+        let Some(target) = self.effective_focus() else {
+            return;
+        };
+        match target {
+            FieldRef::Input(i) => {
+                if let Some(s) = self.inputs.get_mut(i) {
+                    *s = pad_apply(s, key);
+                }
+            }
+            FieldRef::Date(gi) => {
+                if let Some(s) = self.date_texts.get_mut(gi) {
+                    *s = pad_apply(s, key);
+                }
+            }
+            FieldRef::List => {
+                self.list_input = pad_apply(&self.list_input.clone(), key);
+            }
+        }
+        self.focus = Some(target);
+        self.refocus = true;
+    }
+
     fn calculate(&mut self) {
         let Some(idx) = self.selected else {
             return;
@@ -400,8 +592,8 @@ impl App {
         match run_calc(calc.id, &nums) {
             Ok(out) => {
                 // Auto-save every successful calculation to the log; the
-                // log view reads this same in-memory list, so it updates
-                // immediately.
+                // history rail reads this same in-memory list, so the new
+                // entry appears there immediately.
                 let entry = make_entry(calc, &nums, &out);
                 if let Ok(entries) = append_history(entry) {
                     self.log_entries = entries;
@@ -421,25 +613,32 @@ const GREEN: egui::Color32 = egui::Color32::from_rgb(0x4a, 0xde, 0x80);
 const MUTED: egui::Color32 = egui::Color32::from_rgb(0x7a, 0x7a, 0x7a);
 const TEXT: egui::Color32 = egui::Color32::from_rgb(0xd0, 0xd0, 0xd0);
 const RED: egui::Color32 = egui::Color32::from_rgb(0xf2, 0x6d, 0x6d);
-/// Selection background for left-column rows (Purgeon green-sel #163322).
+/// Selection background for rows/chips (Purgeon green-sel #163322).
 const SEL_BG: egui::Color32 = egui::Color32::from_rgb(0x16, 0x33, 0x22);
-/// Hover background for left-column rows — clearly visible on #121212.
+/// Hover background for rows — clearly visible on #121212.
 const HOVER_BG: egui::Color32 = egui::Color32::from_rgb(0x26, 0x26, 0x26);
-/// Height of one left-column list row, in points (scales with zoom).
-const ROW_H: f32 = 26.0;
+/// Shortcut-hint grey on the mode rail: #9a9a9a measures 6.66:1 on the
+/// panel (WCAG AA asks 4.5:1) — brighter than the theme muted grey,
+/// which is only for large/secondary print. See docs/AUDIT.md.
+const HINT: egui::Color32 = egui::Color32::from_rgb(0x9a, 0x9a, 0x9a);
+/// Display background (theme bg #0c0c0c, inset against the panel).
+const DISPLAY_BG: egui::Color32 = egui::Color32::from_rgb(0x0c, 0x0c, 0x0c);
+/// Raised fill for keypad buttons (#181818).
+const RAISED: egui::Color32 = egui::Color32::from_rgb(0x18, 0x18, 0x18);
+/// Equals-key fill (theme green-dim #1d3b27).
+const GREEN_DIM: egui::Color32 = egui::Color32::from_rgb(0x1d, 0x3b, 0x27);
+/// Below this window width (points) the history rail collapses: the
+/// header LOG toggle then switches the centre to the log view, as in
+/// v0.1.x. At the 760 pt minimum window the rail is always collapsed.
+const HISTORY_RAIL_MIN_WIDTH: f32 = 1100.0;
 
-/// One row of the left column (a category or a calculator).
-///
-/// Readability rules (v0.1.2, measured in docs/AUDIT.md): row text is
-/// the main text colour #d0d0d0 at 13 pt — 12.15:1 against the panel,
-/// where WCAG AA asks 4.5:1. The selected row adds a green-selection
-/// background AND green text (7.87:1) AND a solid marker bar on the
-/// left edge, so selection never depends on a subtle colour change
-/// alone. Long names stay on ONE line, truncated with an ellipsis;
-/// the full name appears in a hover tooltip and in the detail header.
-fn list_row(ui: &mut egui::Ui, text: &str, selected: bool) -> bool {
+/// One mode-rail row: short label on the left, shortcut hint on the
+/// right, full category name in the hover tooltip. Selected styling
+/// matches the v0.1.2 list rows (selection background + green text +
+/// 3 pt marker bar), so selection is never colour-alone subtle.
+fn mode_row(ui: &mut egui::Ui, mode: &Mode, count: usize, selected: bool) -> bool {
     let width = ui.available_width();
-    let (rect, resp) = ui.allocate_exact_size(egui::vec2(width, ROW_H), egui::Sense::click());
+    let (rect, resp) = ui.allocate_exact_size(egui::vec2(width, 30.0), egui::Sense::click());
     let painter = ui.painter();
     if selected {
         painter.rect_filled(rect, 0.0, SEL_BG);
@@ -451,24 +650,231 @@ fn list_row(ui: &mut egui::Ui, text: &str, selected: bool) -> bool {
     } else if resp.hovered() {
         painter.rect_filled(rect, 0.0, HOVER_BG);
     }
-    let color = if selected { GREEN } else { TEXT };
-    let inner = egui::Rect::from_min_max(
-        egui::pos2(rect.min.x + 10.0, rect.min.y + 5.0),
-        egui::pos2(rect.max.x - 6.0, rect.max.y),
+    let cy = rect.center().y;
+    painter.text(
+        egui::pos2(rect.min.x + 10.0, cy),
+        egui::Align2::LEFT_CENTER,
+        mode.short,
+        egui::FontId::monospace(13.0),
+        if selected { GREEN } else { TEXT },
     );
-    ui.put(
-        inner,
-        egui::Label::new(egui::RichText::new(text).color(color).size(13.0))
-            .truncate()
-            .selectable(false),
+    painter.text(
+        egui::pos2(rect.max.x - 8.0, cy),
+        egui::Align2::RIGHT_CENTER,
+        &mode.hint,
+        egui::FontId::monospace(10.5),
+        HINT,
     );
     let clicked = resp.clicked();
-    resp.on_hover_text(text);
+    resp.on_hover_text(format!("{} ({count} calculators)", mode.name));
     clicked
+}
+
+/// The history (calculation log) content, shared by the docked right
+/// rail and the narrow-window centre log view. Returns
+/// (entry to re-open, clear-log clicked).
+fn history_ui(ui: &mut egui::Ui, entries: &[LogEntry]) -> (Option<LogEntry>, bool) {
+    let mut to_restore: Option<LogEntry> = None;
+    ui.label(
+        egui::RichText::new(format!("HISTORY ({})", entries.len()))
+            .color(GREEN)
+            .strong()
+            .size(14.0),
+    );
+    ui.label(
+        egui::RichText::new(
+            "Saved calculations, newest first. Every successful calculation \
+             (window or command line) is saved automatically. RE-OPEN loads \
+             an entry's calculator with its inputs restored.",
+        )
+        .color(TEXT),
+    );
+    ui.add_space(8.0);
+    let mut do_clear = false;
+    if ui
+        .add(egui::Button::new(
+            egui::RichText::new("CLEAR LOG").color(RED),
+        ))
+        .clicked()
+    {
+        do_clear = true;
+    }
+    ui.add_space(8.0);
+    ui.separator();
+    if entries.is_empty() {
+        ui.label(
+            egui::RichText::new(
+                "The log is empty. Run any calculator and its result appears here.",
+            )
+            .color(TEXT),
+        );
+    }
+    egui::ScrollArea::vertical()
+        .id_salt("history-scroll")
+        .show(ui, |ui| {
+            for e in entries.iter().rev() {
+                ui.group(|ui| {
+                    ui.horizontal_wrapped(|ui| {
+                        ui.label(egui::RichText::new(&e.timestamp).color(TEXT).size(11.5));
+                        ui.label(egui::RichText::new(&e.name).color(GREEN).strong());
+                        if ui.button("RE-OPEN").clicked() {
+                            to_restore = Some(e.clone());
+                        }
+                    });
+                    ui.label(egui::RichText::new(format!("Inputs: {}", e.inputs)).color(TEXT));
+                    ui.label(egui::RichText::new(format!("Result: {}", e.result)).color(TEXT));
+                });
+                ui.add_space(4.0);
+            }
+        });
+    (to_restore, do_clear)
+}
+
+/// One keypad key: an exact-size button inside an enabled/disabled
+/// scope, so keys that make no sense for the focused field are visibly
+/// greyed out and cannot be pressed. Returns true when clicked.
+fn pad_key(
+    ui: &mut egui::Ui,
+    size: egui::Vec2,
+    label: &str,
+    allowed: bool,
+    fill: egui::Color32,
+    color: egui::Color32,
+) -> bool {
+    let mut clicked = false;
+    ui.add_enabled_ui(allowed, |ui| {
+        clicked = ui
+            .add_sized(
+                size,
+                egui::Button::new(egui::RichText::new(label).color(color).size(16.0).strong())
+                    .fill(fill),
+            )
+            .clicked();
+    });
+    clicked
+}
+
+impl App {
+    /// The Design 3 on-screen keypad: big buttons typing into the
+    /// focused field (see `pad_press`). The separator cell is `/` for
+    /// date fields and `,` for the list field; keys that make no sense
+    /// for the focused field are greyed out via `pad_key_allowed`.
+    /// `=` runs the calculation, exactly like CALCULATE / Enter.
+    fn keypad_ui(&mut self, ui: &mut egui::Ui) {
+        let kind = self.focus_kind();
+        let pad_w = ui.available_width().min(520.0);
+        let btn = egui::vec2((pad_w - 24.0) / 4.0, 48.0);
+        let (sep_label, sep_key) = if kind == FieldKind::List {
+            (",", PadKey::Comma)
+        } else {
+            ("/", PadKey::Slash)
+        };
+        ui.horizontal(|ui| {
+            if pad_key(ui, btn, "7", true, RAISED, TEXT) {
+                self.pad_press(PadKey::Digit('7'));
+            }
+            if pad_key(ui, btn, "8", true, RAISED, TEXT) {
+                self.pad_press(PadKey::Digit('8'));
+            }
+            if pad_key(ui, btn, "9", true, RAISED, TEXT) {
+                self.pad_press(PadKey::Digit('9'));
+            }
+            if pad_key(ui, btn, "DEL", true, RAISED, TEXT) {
+                self.pad_press(PadKey::Backspace);
+            }
+        });
+        ui.horizontal(|ui| {
+            if pad_key(ui, btn, "4", true, RAISED, TEXT) {
+                self.pad_press(PadKey::Digit('4'));
+            }
+            if pad_key(ui, btn, "5", true, RAISED, TEXT) {
+                self.pad_press(PadKey::Digit('5'));
+            }
+            if pad_key(ui, btn, "6", true, RAISED, TEXT) {
+                self.pad_press(PadKey::Digit('6'));
+            }
+            if pad_key(ui, btn, "C", true, RAISED, RED) {
+                self.pad_press(PadKey::Clear);
+            }
+        });
+        ui.horizontal(|ui| {
+            if pad_key(ui, btn, "1", true, RAISED, TEXT) {
+                self.pad_press(PadKey::Digit('1'));
+            }
+            if pad_key(ui, btn, "2", true, RAISED, TEXT) {
+                self.pad_press(PadKey::Digit('2'));
+            }
+            if pad_key(ui, btn, "3", true, RAISED, TEXT) {
+                self.pad_press(PadKey::Digit('3'));
+            }
+            if pad_key(
+                ui,
+                btn,
+                sep_label,
+                pad_key_allowed(kind, sep_key),
+                RAISED,
+                TEXT,
+            ) {
+                self.pad_press(sep_key);
+            }
+        });
+        ui.horizontal(|ui| {
+            if pad_key(
+                ui,
+                btn,
+                "+/-",
+                pad_key_allowed(kind, PadKey::Negate),
+                RAISED,
+                TEXT,
+            ) {
+                self.pad_press(PadKey::Negate);
+            }
+            if pad_key(ui, btn, "0", true, RAISED, TEXT) {
+                self.pad_press(PadKey::Digit('0'));
+            }
+            if pad_key(
+                ui,
+                btn,
+                ".",
+                pad_key_allowed(kind, PadKey::Dot),
+                RAISED,
+                TEXT,
+            ) {
+                self.pad_press(PadKey::Dot);
+            }
+            if pad_key(ui, btn, "=", true, GREEN_DIM, GREEN) {
+                self.calculate();
+            }
+        });
+    }
 }
 
 impl eframe::App for App {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
+        // Alt+ mode shortcuts — the exact set printed on the rail.
+        let mut mode_pick: Option<String> = None;
+        ctx.input(|i| {
+            if i.modifiers.alt {
+                for m in &self.modes {
+                    if i.key_pressed(m.key) {
+                        mode_pick = Some(m.name.clone());
+                    }
+                }
+            }
+        });
+        if let Some(name) = mode_pick {
+            self.category = name;
+        }
+        // Enter = Calculate (single-line fields; the list box keeps
+        // Enter for separating values).
+        let enter_calc = ctx.input(|i| i.key_pressed(egui::Key::Enter))
+            && self.selected.is_some()
+            && self.focus_kind() != FieldKind::List;
+
+        let wide = ctx.content_rect().width() >= HISTORY_RAIL_MIN_WIDTH;
+        let mut hist_restore: Option<LogEntry> = None;
+        let mut hist_clear = false;
+
         egui::TopBottomPanel::top("top").show(ctx, |ui| {
             ui.horizontal(|ui| {
                 ui.label(
@@ -501,10 +907,12 @@ impl eframe::App for App {
                 }
             });
         });
-        egui::SidePanel::left("cats")
+
+        // ---- Mode rail (far left) ----
+        egui::SidePanel::left("modes")
             .resizable(true)
-            .default_width(250.0)
-            .width_range(190.0..=400.0)
+            .default_width(178.0)
+            .width_range(140.0..=240.0)
             .show(ctx, |ui| {
                 ui.label(
                     egui::RichText::new("SEARCH")
@@ -512,10 +920,7 @@ impl eframe::App for App {
                         .strong()
                         .size(12.0),
                 );
-                // The search box takes whatever width the (user-resizable)
-                // panel leaves after the Clear button, so it never clips
-                // when the panel is narrowed or the text is zoomed.
-                let search_w = (ui.available_width() - 70.0).max(110.0);
+                let search_w = (ui.available_width() - 58.0).max(80.0);
                 ui.horizontal(|ui| {
                     ui.add(
                         egui::TextEdit::singleline(&mut self.search)
@@ -526,241 +931,397 @@ impl eframe::App for App {
                         self.search.clear();
                     }
                 });
-                ui.add_space(6.0);
+                ui.add_space(8.0);
                 ui.label(
-                    egui::RichText::new("CATEGORY")
+                    egui::RichText::new("MODES")
                         .color(GREEN)
                         .strong()
                         .size(12.0),
                 );
                 egui::ScrollArea::vertical()
-                    .id_salt("cat-scroll")
-                    .max_height(180.0)
+                    .id_salt("mode-scroll")
                     .show(ui, |ui| {
-                        for cat in &self.categories {
-                            let n = if cat == "All" {
+                        let mut picked: Option<String> = None;
+                        for m in &self.modes {
+                            let n = if m.name == "All" {
                                 self.calcs.len()
                             } else {
-                                self.calcs.iter().filter(|c| c.category == cat).count()
+                                self.calcs.iter().filter(|c| c.category == m.name).count()
                             };
-                            let label = format!("{} ({})", cat.to_uppercase(), n);
-                            if list_row(ui, &label, self.category == *cat) {
-                                self.category = cat.clone();
+                            if mode_row(ui, m, n, self.category == m.name) {
+                                picked = Some(m.name.clone());
                             }
                         }
+                        if let Some(name) = picked {
+                            self.category = name;
+                        }
                     });
-                ui.add_space(6.0);
+                ui.add_space(8.0);
                 ui.separator();
-                ui.label(
-                    egui::RichText::new("CALCULATORS")
-                        .color(GREEN)
-                        .strong()
-                        .size(12.0),
-                );
-                let mut to_select: Option<usize> = None;
-                egui::ScrollArea::vertical()
-                    .id_salt("calc-scroll")
-                    .show(ui, |ui| {
-                        for (i, c) in self.calcs.iter().enumerate() {
-                            if !self.visible(c) {
-                                continue;
-                            }
-                            if list_row(ui, c.name, self.selected == Some(i)) {
-                                to_select = Some(i);
-                            }
-                        }
-                    });
-                if let Some(i) = to_select {
-                    self.select(i);
-                }
-            });
-        egui::CentralPanel::default().show(ctx, |ui| {
-            if self.show_log {
-                ui.label(
-                    egui::RichText::new("CALCULATION LOG")
-                        .color(GREEN)
-                        .strong()
-                        .size(16.0),
-                );
                 ui.label(
                     egui::RichText::new(format!(
-                        "{} saved calculations, newest first. Every successful calculation (window or command line) is saved here automatically. Click RE-OPEN to load an entry's calculator with its inputs restored.",
-                        self.log_entries.len()
+                        "{} calculators in {} modes. Alt+ a shown key picks a mode.",
+                        self.calcs.len(),
+                        self.modes.len() - 1
                     ))
-                    .color(TEXT),
+                    .color(HINT)
+                    .size(11.5),
                 );
-                ui.add_space(6.0);
-                let mut do_clear = false;
-                if ui
-                    .add(egui::Button::new(
-                        egui::RichText::new("CLEAR LOG").color(RED),
-                    ))
-                    .clicked()
-                {
-                    do_clear = true;
+            });
+
+        // ---- History rail (right; wide windows only) ----
+        if self.show_log && wide {
+            egui::SidePanel::right("history")
+                .resizable(true)
+                .default_width(300.0)
+                .width_range(240.0..=420.0)
+                .show(ctx, |ui| {
+                    let (restore, clear) = history_ui(ui, &self.log_entries);
+                    if restore.is_some() {
+                        hist_restore = restore;
+                    }
+                    hist_clear = hist_clear || clear;
+                });
+        }
+
+        egui::CentralPanel::default().show(ctx, |ui| {
+            // Narrow window + log on: the centre becomes the log view
+            // (the v0.1.x behaviour the LOG toggle has always had).
+            if self.show_log && !wide {
+                let (restore, clear) = history_ui(ui, &self.log_entries);
+                if restore.is_some() {
+                    hist_restore = restore;
                 }
-                if do_clear {
-                    let _ = clear_history();
-                    self.log_entries.clear();
-                }
-                ui.add_space(6.0);
-                ui.separator();
-                let mut to_restore: Option<LogEntry> = None;
-                if self.log_entries.is_empty() {
-                    ui.label(
-                        egui::RichText::new("The log is empty. Run any calculator and its result appears here.")
-                            .color(TEXT),
-                    );
-                }
-                egui::ScrollArea::vertical()
-                    .id_salt("log-scroll")
-                    .show(ui, |ui| {
-                        for e in self.log_entries.iter().rev() {
-                            ui.group(|ui| {
-                                ui.horizontal(|ui| {
-                                    ui.label(
-                                        egui::RichText::new(&e.timestamp)
-                                            .color(TEXT)
-                                            .size(11.5),
-                                    );
-                                    ui.label(
-                                        egui::RichText::new(&e.name)
-                                            .color(GREEN)
-                                            .strong(),
-                                    );
-                                    if ui.button("RE-OPEN").clicked() {
-                                        to_restore = Some(e.clone());
-                                    }
-                                });
-                                ui.label(
-                                    egui::RichText::new(format!("Inputs: {}", e.inputs))
-                                        .color(TEXT),
-                                );
-                                ui.label(
-                                    egui::RichText::new(format!("Result: {}", e.result))
-                                        .color(TEXT),
-                                );
-                            });
-                            ui.add_space(4.0);
-                        }
-                    });
-                if let Some(e) = to_restore {
-                    self.restore(&e);
-                }
+                hist_clear = hist_clear || clear;
                 return;
             }
-            // The whole detail pane lives in a vertical scroll area:
-            // at the minimum window size, or at 150-200% text zoom,
-            // content scrolls into reach instead of clipping or
-            // overlapping. Input rows inside use wrapping layout and
-            // widths derived from the available width (see below).
             egui::ScrollArea::vertical()
                 .id_salt("detail-scroll")
                 .show(ui, |ui| {
-            let Some(idx) = self.selected else {
-                ui.label(
-                    egui::RichText::new("Pick a calculator on the left.")
-                        .color(TEXT)
-                        .size(14.0),
-                );
-                ui.label(
-                    egui::RichText::new("Every calculator here also works from the command line — e.g. CalcDex compound-interest 1000 5 10 12")
-                        .color(TEXT),
-                );
-                return;
-            };
-            // Borrow fields separately to satisfy the borrow checker.
-            let (id, name, category, desc, inputs_labels, is_list, date_groups) = {
-                let c = &self.calcs[idx];
-                (
-                    c.id,
-                    c.name,
-                    c.category,
-                    c.desc,
-                    c.inputs,
-                    c.list,
-                    c.date_groups,
-                )
-            };
-            ui.label(
-                egui::RichText::new(name.to_uppercase()).color(GREEN).strong().size(16.0),
-            );
-            ui.label(egui::RichText::new(format!("[{category}]  id: {id}")).color(TEXT).size(11.5));
-            ui.add_space(4.0);
-            ui.label(egui::RichText::new(desc).color(TEXT));
-            ui.add_space(8.0);
-            // Input rows: the label column takes 38% of the pane width
-            // (clamped 130-300 pt) and the field takes what is left
-            // (clamped 150-380 pt). Both are recomputed every frame from
-            // the actual available width, so resizing the window or the
-            // left panel, or zooming the text, reflows the rows instead
-            // of pushing fields off the right edge.
-            let avail = ui.available_width();
-            let label_w = (avail * 0.38).clamp(130.0, 300.0);
-            let field_w = (avail - label_w - 16.0).clamp(150.0, 380.0);
-            if is_list {
-                ui.label(egui::RichText::new("NUMBERS (COMMA OR SPACE SEPARATED)").color(TEXT).size(12.0));
-                ui.add(
-                    egui::TextEdit::multiline(&mut self.list_input)
-                        .desired_rows(3)
-                        .desired_width(f32::INFINITY),
-                );
-            } else {
-                let mut gi = 0usize;
-                let mut i = 0usize;
-                while i < inputs_labels.len() {
-                    if let Some(g) = date_groups.iter().find(|g| g.start == i) {
-                        ui.horizontal_wrapped(|ui| {
-                            ui.add_sized([label_w, 20.0], egui::Label::new(egui::RichText::new(g.label.to_uppercase()).color(TEXT).size(12.0)));
-                            ui.add(
-                                egui::TextEdit::singleline(&mut self.date_texts[gi])
-                                    .hint_text("MM/DD/YYYY")
-                                    .desired_width(170.0),
-                            );
-                            if ui
-                                .add(egui::Button::new(egui::RichText::new("Today?").color(GREEN)))
-                                .clicked()
-                            {
-                                self.date_texts[gi] = today_str();
-                            }
-                        });
-                        ui.horizontal(|ui| {
-                            ui.add_sized([label_w, 20.0], egui::Label::new(""));
-                            ui.label(egui::RichText::new(DATE_HINT).color(TEXT).size(11.5));
-                        });
-                        gi += 1;
-                        i += 3;
-                    } else {
-                        let label = inputs_labels[i];
-                        ui.horizontal_wrapped(|ui| {
-                            ui.add_sized([label_w, 20.0], egui::Label::new(egui::RichText::new(label.to_uppercase()).color(TEXT).size(12.0)));
-                            ui.add(
-                                egui::TextEdit::singleline(&mut self.inputs[i]).desired_width(field_w),
-                            );
-                        });
-                        i += 1;
+                    self.centre_ui(ui, enter_calc);
+                });
+        });
+
+        if hist_clear {
+            let _ = clear_history();
+            self.log_entries.clear();
+        }
+        if let Some(e) = hist_restore {
+            self.restore(&e);
+        }
+    }
+}
+
+impl App {
+    /// The centre column: calculator chip strip, title + description,
+    /// display, form, Calculate + keypad, steps footer.
+    fn centre_ui(&mut self, ui: &mut egui::Ui, enter_calc: bool) {
+        // ---- Calculator strip for the active mode ----
+        ui.label(
+            egui::RichText::new(format!("CALCULATORS — {}", self.category.to_uppercase()))
+                .color(GREEN)
+                .strong()
+                .size(12.0),
+        );
+        let mut to_select: Option<usize> = None;
+        egui::ScrollArea::vertical()
+            .id_salt("strip-scroll")
+            .max_height(112.0)
+            .show(ui, |ui| {
+                ui.horizontal_wrapped(|ui| {
+                    let mut any = false;
+                    for (i, c) in self.calcs.iter().enumerate() {
+                        if !self.visible(c) {
+                            continue;
+                        }
+                        any = true;
+                        let selected = self.selected == Some(i);
+                        let btn = egui::Button::new(
+                            egui::RichText::new(c.name)
+                                .color(if selected { GREEN } else { TEXT })
+                                .size(12.5),
+                        )
+                        .fill(if selected { SEL_BG } else { RAISED })
+                        .stroke(egui::Stroke::new(
+                            1.0_f32,
+                            if selected {
+                                GREEN
+                            } else {
+                                egui::Color32::from_rgb(0x26, 0x26, 0x26)
+                            },
+                        ));
+                        let resp = ui.add(btn);
+                        if resp.clicked() {
+                            to_select = Some(i);
+                        }
+                        resp.on_hover_text(c.name);
                     }
+                    if !any {
+                        ui.label(
+                            egui::RichText::new(
+                                "No calculators match — clear the search or pick another mode.",
+                            )
+                            .color(TEXT),
+                        );
+                    }
+                });
+            });
+        if let Some(i) = to_select {
+            self.select(i);
+        }
+        ui.add_space(8.0);
+        ui.separator();
+
+        let Some(idx) = self.selected else {
+            egui::Frame::new()
+                .fill(DISPLAY_BG)
+                .inner_margin(egui::Margin::same(10))
+                .stroke(egui::Stroke::new(
+                    1.0_f32,
+                    egui::Color32::from_rgb(0x26, 0x26, 0x26),
+                ))
+                .show(ui, |ui| {
+                    ui.label(
+                        egui::RichText::new("PICK A CALCULATOR")
+                            .color(GREEN)
+                            .strong()
+                            .size(14.0),
+                    );
+                    ui.add_space(4.0);
+                    ui.label(
+                        egui::RichText::new(
+                            "Choose one from the strip above — or filter by name with                              the Search box in the rail. Modes switch with Alt+ the                              key printed on the rail.",
+                        )
+                        .color(TEXT),
+                    );
+                    ui.add_space(4.0);
+                    ui.label(
+                        egui::RichText::new("Every calculator here also works from the command line — e.g. CalcDex compound-interest 1000 5 10 12")
+                            .color(HINT),
+                    );
+                });
+            return;
+        };
+        // Borrow fields separately to satisfy the borrow checker.
+        let (id, name, category, desc, inputs_labels, is_list, date_groups) = {
+            let c = &self.calcs[idx];
+            (
+                c.id,
+                c.name,
+                c.category,
+                c.desc,
+                c.inputs,
+                c.list,
+                c.date_groups,
+            )
+        };
+        ui.label(
+            egui::RichText::new(name.to_uppercase())
+                .color(GREEN)
+                .strong()
+                .size(16.0),
+        );
+        ui.label(
+            egui::RichText::new(format!("[{category}]  id: {id}"))
+                .color(TEXT)
+                .size(11.5),
+        );
+        ui.add_space(4.0);
+        ui.label(egui::RichText::new(desc).color(TEXT));
+        ui.add_space(8.0);
+
+        // ---- Display (Design 3: prominent result zone) ----
+        let is_error = self.output.starts_with("Error")
+            || self.output.contains("is not a number")
+            || self.output.contains("needs a number");
+        egui::Frame::new()
+            .fill(DISPLAY_BG)
+            .inner_margin(egui::Margin::same(10))
+            .stroke(egui::Stroke::new(
+                1.0_f32,
+                egui::Color32::from_rgb(0x26, 0x26, 0x26),
+            ))
+            .show(ui, |ui| {
+                ui.label(
+                    egui::RichText::new(format!("DISPLAY — {}", name.to_uppercase()))
+                        .color(HINT)
+                        .size(11.5),
+                );
+                if self.output.is_empty() {
+                    ui.label(
+                        egui::RichText::new(
+                            "Enter the values below, then press CALCULATE (or = on the keypad).",
+                        )
+                        .color(HINT)
+                        .size(14.0),
+                    );
+                } else if is_error {
+                    ui.label(egui::RichText::new(&self.output).color(RED).size(16.0));
+                } else {
+                    let headline = self.output.lines().next().unwrap_or("");
+                    ui.label(
+                        egui::RichText::new(headline)
+                            .color(GREEN)
+                            .strong()
+                            .size(24.0),
+                    );
+                }
+            });
+        ui.add_space(8.0);
+
+        // ---- Form ----
+        // Input rows: the label column takes 38% of the pane width
+        // (clamped 130-300 pt) and the field takes what is left
+        // (clamped 150-380 pt), recomputed every frame so resizing or
+        // zooming reflows instead of clipping.
+        let avail = ui.available_width();
+        let label_w = (avail * 0.38).clamp(130.0, 300.0);
+        let field_w = (avail - label_w - 16.0).clamp(150.0, 380.0);
+        let eff_focus = self.effective_focus();
+        let mut pending_focus: Option<FieldRef> = None;
+        let mut refocus_pending = self.refocus;
+        if is_list {
+            ui.label(
+                egui::RichText::new("NUMBERS (COMMA OR SPACE SEPARATED)")
+                    .color(TEXT)
+                    .size(12.0),
+            );
+            let resp = ui.add(
+                egui::TextEdit::multiline(&mut self.list_input)
+                    .desired_rows(3)
+                    .desired_width(f32::INFINITY),
+            );
+            if resp.clicked() || resp.has_focus() {
+                pending_focus = Some(FieldRef::List);
+            }
+            if refocus_pending && eff_focus == Some(FieldRef::List) {
+                resp.request_focus();
+                refocus_pending = false;
+            }
+        } else {
+            let mut gi = 0usize;
+            let mut i = 0usize;
+            while i < inputs_labels.len() {
+                if let Some(g) = date_groups.iter().find(|g| g.start == i) {
+                    ui.horizontal_wrapped(|ui| {
+                        ui.add_sized(
+                            [label_w, 20.0],
+                            egui::Label::new(
+                                egui::RichText::new(g.label.to_uppercase())
+                                    .color(TEXT)
+                                    .size(12.0),
+                            ),
+                        );
+                        let resp = ui.add(
+                            egui::TextEdit::singleline(&mut self.date_texts[gi])
+                                .hint_text("MM/DD/YYYY")
+                                .desired_width(170.0),
+                        );
+                        if resp.clicked() || resp.has_focus() {
+                            pending_focus = Some(FieldRef::Date(gi));
+                        }
+                        if refocus_pending && eff_focus == Some(FieldRef::Date(gi)) {
+                            resp.request_focus();
+                            refocus_pending = false;
+                        }
+                        if ui
+                            .add(egui::Button::new(
+                                egui::RichText::new("Today?").color(GREEN),
+                            ))
+                            .clicked()
+                        {
+                            self.date_texts[gi] = today_str();
+                            pending_focus = Some(FieldRef::Date(gi));
+                        }
+                    });
+                    ui.horizontal(|ui| {
+                        ui.add_sized([label_w, 20.0], egui::Label::new(""));
+                        ui.label(egui::RichText::new(DATE_HINT).color(TEXT).size(11.5));
+                    });
+                    gi += 1;
+                    i += 3;
+                } else {
+                    let label = inputs_labels[i];
+                    ui.horizontal_wrapped(|ui| {
+                        ui.add_sized(
+                            [label_w, 20.0],
+                            egui::Label::new(
+                                egui::RichText::new(label.to_uppercase())
+                                    .color(TEXT)
+                                    .size(12.0),
+                            ),
+                        );
+                        let resp = ui.add(
+                            egui::TextEdit::singleline(&mut self.inputs[i]).desired_width(field_w),
+                        );
+                        if resp.clicked() || resp.has_focus() {
+                            pending_focus = Some(FieldRef::Input(i));
+                        }
+                        if refocus_pending && eff_focus == Some(FieldRef::Input(i)) {
+                            resp.request_focus();
+                            refocus_pending = false;
+                        }
+                    });
+                    i += 1;
                 }
             }
-            ui.add_space(8.0);
+        }
+        if let Some(f) = pending_focus {
+            self.focus = Some(f);
+        }
+        self.refocus = refocus_pending;
+
+        ui.add_space(8.0);
+        ui.horizontal(|ui| {
             if ui
-                .add(egui::Button::new(egui::RichText::new("CALCULATE").color(GREEN).strong()))
+                .add_sized(
+                    [180.0, 36.0],
+                    egui::Button::new(egui::RichText::new("CALCULATE").color(GREEN).strong()),
+                )
                 .clicked()
             {
                 self.calculate();
             }
+            ui.label(
+                egui::RichText::new("Enter = Calculate")
+                    .color(HINT)
+                    .size(11.5),
+            );
+        });
+
+        // ---- Keypad ----
+        ui.add_space(8.0);
+        ui.label(
+            egui::RichText::new("KEYPAD")
+                .color(GREEN)
+                .strong()
+                .size(12.0),
+        );
+        ui.label(
+            egui::RichText::new(
+                "The keypad types into the last field you clicked — a whole \
+                 calculation can be run with the mouse alone.",
+            )
+            .color(HINT)
+            .size(11.5),
+        );
+        self.keypad_ui(ui);
+
+        if enter_calc {
+            self.calculate();
+        }
+
+        // ---- Steps footer: the FULL result text, never truncated ----
+        if !self.output.is_empty() && !is_error {
             ui.add_space(8.0);
             ui.separator();
-            if !self.output.is_empty() {
-                let is_error = self.output.starts_with("Error") || self.output.contains("is not a number");
-                ui.label(egui::RichText::new("RESULT").color(GREEN).strong().size(12.0));
-                ui.label(
-                    egui::RichText::new(&self.output)
-                        .color(if is_error { RED } else { TEXT })
-                        .size(13.0),
-                );
-            }
-                });
-        });
+            ui.label(
+                egui::RichText::new("STEPS / FULL RESULT")
+                    .color(GREEN)
+                    .strong()
+                    .size(12.0),
+            );
+            ui.label(egui::RichText::new(&self.output).color(TEXT).size(13.0));
+        }
     }
 }

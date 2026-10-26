@@ -688,3 +688,109 @@ pub fn gcd_i(mut a: i64, mut b: i64) -> i64 {
     }
     a
 }
+
+// ---------- On-screen keypad editing (v0.2.0, Design 3) ----------
+//
+// The Design 3 layout has a big on-screen keypad that types into the
+// currently focused input field. The editing itself is a pure function
+// here in the library so it is unit-tested (`tests/v020.rs`); the GUI
+// only decides WHICH field a key press goes to. Keyboard typing is
+// unaffected — the pad writes to the same field strings the keyboard
+// edits.
+
+/// What kind of field a keypad press targets.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum FieldKind {
+    /// A single number (most calculators).
+    Numeric,
+    /// One merged MM/DD/YYYY date field.
+    Date,
+    /// The comma/space-separated number list of a list calculator.
+    List,
+}
+
+/// One keypad key.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum PadKey {
+    Digit(char),
+    Dot,
+    Slash,
+    Comma,
+    Negate,
+    Backspace,
+    Clear,
+}
+
+/// Which keys make sense for which field kind. The GUI greys out the
+/// rest, so a press that reaches `pad_apply` is always meaningful.
+/// `/` only belongs in dates; `,` only separates list values; a date
+/// has no decimal point and no sign key.
+pub fn pad_key_allowed(kind: FieldKind, key: PadKey) -> bool {
+    match kind {
+        FieldKind::Numeric => matches!(
+            key,
+            PadKey::Digit(_) | PadKey::Dot | PadKey::Negate | PadKey::Backspace | PadKey::Clear
+        ),
+        FieldKind::Date => matches!(
+            key,
+            PadKey::Digit(_) | PadKey::Slash | PadKey::Backspace | PadKey::Clear
+        ),
+        FieldKind::List => matches!(
+            key,
+            PadKey::Digit(_)
+                | PadKey::Dot
+                | PadKey::Comma
+                | PadKey::Negate
+                | PadKey::Backspace
+                | PadKey::Clear
+        ),
+    }
+}
+
+/// Apply one keypad press to a field's text and return the new text.
+pub fn pad_apply(text: &str, key: PadKey) -> String {
+    match key {
+        PadKey::Clear => String::new(),
+        PadKey::Backspace => {
+            let mut s = text.to_string();
+            s.pop();
+            s
+        }
+        PadKey::Digit(d) => {
+            let mut s = text.to_string();
+            s.push(d);
+            s
+        }
+        PadKey::Slash => {
+            if text.is_empty() || text.ends_with('/') {
+                text.to_string()
+            } else {
+                format!("{text}/")
+            }
+        }
+        PadKey::Comma => {
+            if text.is_empty() || text.ends_with(',') || text.ends_with(' ') {
+                text.to_string()
+            } else {
+                format!("{text}, ")
+            }
+        }
+        PadKey::Dot => {
+            // One decimal point per number: in a list, only the number
+            // currently being typed (after the last separator) counts.
+            let last = text.rsplit([' ', ',']).next().unwrap_or("");
+            if last.contains('.') {
+                text.to_string()
+            } else {
+                format!("{text}.")
+            }
+        }
+        PadKey::Negate => {
+            if let Some(rest) = text.strip_prefix('-') {
+                rest.to_string()
+            } else {
+                format!("-{text}")
+            }
+        }
+    }
+}
