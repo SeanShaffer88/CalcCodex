@@ -18,6 +18,9 @@
 #![allow(clippy::possible_missing_else)]
 
 pub mod calcs;
+pub mod features;
+pub mod meta;
+pub mod settings;
 
 pub type CalcFn = Box<dyn Fn(&[f64]) -> Result<String, String> + Sync + Send>;
 
@@ -36,6 +39,16 @@ pub struct Calc {
     /// that the GUI/CLI treat as ONE date field labelled `label`, entered
     /// as MM/DD/YYYY. Empty for non-date calculators.
     pub date_groups: &'static [DateGroup],
+    /// Teaching example inputs (item #11), filled from
+    /// `meta::EXAMPLES` when the registry is built.
+    pub example: &'static [f64],
+    /// Optional hand-written per-field hints (item #20), filled from
+    /// `meta::HINTS`; `meta::hint_for` falls back to a generated hint
+    /// for any field without one, so every field has a hint.
+    pub hints: &'static [&'static str],
+    /// Pair calculators whose list may end with ONE extra single
+    /// value (linear regression's calibration measurement).
+    pub tail: bool,
     pub run: CalcFn,
 }
 
@@ -74,6 +87,9 @@ impl Calc {
             list: false,
             pairs: false,
             date_groups: &[],
+            example: &[],
+            hints: &[],
+            tail: false,
             run: Box::new(run),
         }
     }
@@ -88,6 +104,21 @@ impl Calc {
     pub fn pair_mode(mut self) -> Calc {
         self.list = true;
         self.pairs = true;
+        self
+    }
+    /// Pairs plus one optional trailing single value.
+    pub fn pair_tail_mode(mut self) -> Calc {
+        self.list = true;
+        self.pairs = true;
+        self.tail = true;
+        self
+    }
+    pub fn with_example(mut self, example: &'static [f64]) -> Calc {
+        self.example = example;
+        self
+    }
+    pub fn with_hints(mut self, hints: &'static [&'static str]) -> Calc {
+        self.hints = hints;
         self
     }
 }
@@ -105,6 +136,20 @@ pub fn all_calcs() -> Vec<Calc> {
     calcs::stats::register(&mut v);
     calcs::everyday::register(&mut v);
     calcs::sports_food_eco::register(&mut v);
+    // v0.3.0: attach the central metadata tables (examples + hints)
+    // to the registry entries, so they are part of each Calc spec.
+    for c in &mut v {
+        for (id, ex) in meta::EXAMPLES {
+            if *id == c.id {
+                c.example = ex;
+            }
+        }
+        for (id, hints) in meta::HINTS {
+            if *id == c.id {
+                c.hints = hints;
+            }
+        }
+    }
     v
 }
 
@@ -128,7 +173,7 @@ pub fn run_calc(id: &str, args: &[f64]) -> Result<String, String> {
             if c.list && args.is_empty() {
                 return Err("Enter at least one number.".into());
             }
-            if c.pairs && args.len() % 2 != 0 {
+            if c.pairs && !c.tail && args.len() % 2 != 0 {
                 return Err(
                     "This calculator takes values in pairs — you gave an odd count of numbers."
                         .into(),
@@ -687,110 +732,4 @@ pub fn gcd_i(mut a: i64, mut b: i64) -> i64 {
         a = t;
     }
     a
-}
-
-// ---------- On-screen keypad editing (v0.2.0, Design 3) ----------
-//
-// The Design 3 layout has a big on-screen keypad that types into the
-// currently focused input field. The editing itself is a pure function
-// here in the library so it is unit-tested (`tests/v020.rs`); the GUI
-// only decides WHICH field a key press goes to. Keyboard typing is
-// unaffected — the pad writes to the same field strings the keyboard
-// edits.
-
-/// What kind of field a keypad press targets.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum FieldKind {
-    /// A single number (most calculators).
-    Numeric,
-    /// One merged MM/DD/YYYY date field.
-    Date,
-    /// The comma/space-separated number list of a list calculator.
-    List,
-}
-
-/// One keypad key.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-pub enum PadKey {
-    Digit(char),
-    Dot,
-    Slash,
-    Comma,
-    Negate,
-    Backspace,
-    Clear,
-}
-
-/// Which keys make sense for which field kind. The GUI greys out the
-/// rest, so a press that reaches `pad_apply` is always meaningful.
-/// `/` only belongs in dates; `,` only separates list values; a date
-/// has no decimal point and no sign key.
-pub fn pad_key_allowed(kind: FieldKind, key: PadKey) -> bool {
-    match kind {
-        FieldKind::Numeric => matches!(
-            key,
-            PadKey::Digit(_) | PadKey::Dot | PadKey::Negate | PadKey::Backspace | PadKey::Clear
-        ),
-        FieldKind::Date => matches!(
-            key,
-            PadKey::Digit(_) | PadKey::Slash | PadKey::Backspace | PadKey::Clear
-        ),
-        FieldKind::List => matches!(
-            key,
-            PadKey::Digit(_)
-                | PadKey::Dot
-                | PadKey::Comma
-                | PadKey::Negate
-                | PadKey::Backspace
-                | PadKey::Clear
-        ),
-    }
-}
-
-/// Apply one keypad press to a field's text and return the new text.
-pub fn pad_apply(text: &str, key: PadKey) -> String {
-    match key {
-        PadKey::Clear => String::new(),
-        PadKey::Backspace => {
-            let mut s = text.to_string();
-            s.pop();
-            s
-        }
-        PadKey::Digit(d) => {
-            let mut s = text.to_string();
-            s.push(d);
-            s
-        }
-        PadKey::Slash => {
-            if text.is_empty() || text.ends_with('/') {
-                text.to_string()
-            } else {
-                format!("{text}/")
-            }
-        }
-        PadKey::Comma => {
-            if text.is_empty() || text.ends_with(',') || text.ends_with(' ') {
-                text.to_string()
-            } else {
-                format!("{text}, ")
-            }
-        }
-        PadKey::Dot => {
-            // One decimal point per number: in a list, only the number
-            // currently being typed (after the last separator) counts.
-            let last = text.rsplit([' ', ',']).next().unwrap_or("");
-            if last.contains('.') {
-                text.to_string()
-            } else {
-                format!("{text}.")
-            }
-        }
-        PadKey::Negate => {
-            if let Some(rest) = text.strip_prefix('-') {
-                rest.to_string()
-            } else {
-                format!("-{text}")
-            }
-        }
-    }
 }
