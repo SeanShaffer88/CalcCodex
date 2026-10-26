@@ -105,14 +105,14 @@ v0.1.2 — v0.1.2 deliberately keeps the current layout and only
 carries the readability / contrast / responsive work, which is
 written generally so it carries forward into Design 3.
 
-## 2026-10-25 — v0.2.0: Design 3 built (layout decisions + brief)
+## 2026-10-25 — v0.2.0: Design 3 built (layout decisions)
 
-SEAN's design brief for this build, verbatim (2026-10-25):
-"CalcDex should feel interactive, intuitive, well-organized,
-accessible, easy, robust, not cumbersome — and very polished."
-The eight words were treated as acceptance criteria; the CHANGELOG /
-README "Feel" section records how each was honoured and what is
-still Unverified (SEAN's on-Windows run is the verdict).
+Design acceptance criteria for this build: instant visible
+response to input, fewest-clicks flows, a stable predictable
+layout, WCAG AA contrast with a full keyboard path, no-panic
+teaching errors, an uncluttered window, and a dedicated polish
+pass (aligned keypad grid, 4/8 pt spacing rhythm, designed empty
+states). The on-Windows result is Unverified until a field run.
 
 Layout decisions taken while building Design 3:
 
@@ -164,3 +164,82 @@ Layout decisions taken while building Design 3:
   at 24 pt; the complete output (formula, substituted values,
   result) is duplicated verbatim into the STEPS / FULL RESULT
   footer — the design's "steps footer" — so nothing is truncated.
+
+## 2026-10-25 — v0.3.0: Batch 1 format choices
+
+- **Sig-figs display (#1):** rounded showing is ADDED, never
+  substituted; where plain notation would make the count
+  ambiguous (integer part longer than the digit count, or
+  exponent < -4) the rounded value is shown in scientific form
+  (1628.89 at 3 figures = `1.63e3`). Dates inside a headline are
+  never rewritten.
+- **Vary CLI order (#16):** `CalcDex <id> --vary <field> <start>
+  <end> <step> <other numbers...>` — field numbered from 0 (the
+  `--describe` numbering), then the sweep, then the remaining
+  inputs in their normal order. Output is CSV (`value,result`).
+- **Batch CSV (#31):** header row = the display field labels in
+  order (date groups = their one merged label; cells may be
+  MM/DD/YYYY). List calculators: header is the single list label
+  and each row's cells are the list values. Output = input cells
+  + headline result (first line), or `ERROR: <message>`. A small
+  hand-written CSV parser (quotes/commas/CRLF) instead of a new
+  dependency.
+- **Regression inputs (#34):** the registry's pair convention —
+  (x, y) pairs in one list — plus ONE optional trailing value, a
+  measured y for calibration (a new `pair_tail_mode` registry
+  flag; other pair calculators are unaffected).
+- **Recent placement (#46):** Recent chips live in the FAVOURITES
+  mode above the chip strip, not above every mode's strip — the
+  centre strip stays about the current mode (uncluttered), and
+  Favourites is one Alt+F away.
+- **Settings file (#46/#48/#1):** one line-format text file,
+  `%APPDATA%\CalcDex\settings.txt`, shared by favourites,
+  recent, remembered inputs and sig-figs. The file is the shared
+  source of truth for GUI and CLI (see the CLI-parity decision
+  below); corrupt content falls back to defaults.
+- **Defaults policy (#50):** a field's opening default is its
+  teaching example unless `meta::DEFAULT_OVERRIDES` says
+  otherwise — so defaults and examples can never drift apart, and
+  every default is a value the audit has run. Gas-law defaults
+  are STP (273.15 K, 1 atm, 22.414 L molar volume); gravity
+  stays the named constant g = 9.80665 in the physics formulas
+  (it is not an input anywhere).
+
+## 2026-10-25 — Standing rule: tooltips for everything (applied)
+
+Rule (applied from v0.3.0): every button, menu item and
+interactive control must have a tooltip, no exceptions.
+Applied to CalcDex from v0.3.0: all
+buttons and selectable labels are constructed ONLY through the
+`tip_btn` / `tip_btn_sized` / `tip_sel` / `tip_sel_value` /
+`tip_chip` helpers in main.rs, each of which REQUIRES a tooltip
+argument;
+text edits and the combo box carry tooltips on their responses;
+mode rows and history entries already had them. tests/tooltips.rs
+scans src/main.rs and fails if a bare widget constructor appears
+outside the helpers, so the rule is enforced by the gate, not by
+memory.
+
+## 2026-10-25 — Standing rule: full command-line support (applied)
+
+Rule (applied from v0.3.0): every capability available in the
+window must also be usable from the command line. CalcDex's
+one-registry design already gave this for
+calculations; v0.3.0 closes the state-feature gaps: `--favourite
+<id>` / `--unfavourite <id>` / `--favourites` operate on the same
+settings file the window uses, CLI runs write remembered inputs
+and Recent into that file too, and `--describe` / `--example` /
+`--vary` / `--batch` / `--sig-figs` mirror the window's panels.
+docs/PARITY.md is maintained as the GUI-vs-CLI parity table;
+there are no window-only capabilities — every capability in the
+window has a CLI counterpart.
+
+## 2026-10-25 — v0.3.0: on-screen keypad removed
+
+The on-screen keypad (added in v0.2.0) is removed in v0.3.0: it
+made the window contents uneven. The keypad UI, its focus
+tracking, and the library pad code (`pad_apply` and friends, with
+their tests) are deleted — no dead code. The centre column now
+spans its full width uniformly and form fields widened (cap
+380 → 480 pt). Keyboard flow is unchanged: typing in the fields,
+Enter = Calculate, Alt+ mode keys, Ctrl+K search.

@@ -1,5 +1,84 @@
 # Changelog — CalcDex
 
+## 0.3.0 — 2026-10-25
+
+**Batch 1 of the 50-enhancement program — items 1, 11, 16, 20,
+31, 34, 46, 47, 48, 50: DONE.** (Program tracker: Batch 1 complete;
+next is the rigour batch, items 2–10 + 37.) Also the first release
+This release
+also applies two standing rules in full — **tooltips for
+everything** and **full command-line support** — both recorded in
+DECISIONS.md.
+
+- **#1 Significant-figures mode.** Header SIG FIGS selector
+  (Off/2/3/4/5/6) and CLI `--sig-figs N`: the headline is ALSO
+  shown rounded to N significant figures (pure `format_sig_figs`
+  in the library, classic traps tested: 0, negatives, powers of
+  ten, 999.9, 0.0000999). Display only — full precision is kept
+  everywhere, including the log.
+- **#11 Try an example.** Every one of the 300 calculators carries
+  hand-written teaching example inputs (registry-wide test: each
+  has one, and it runs). TRY AN EXAMPLE button fills + runs in one
+  click; `CalcDex <id> --example` does the same on the CLI.
+- **#16 Vary-one-input table.** GUI VARY section + CLI
+  `<id> --vary <field> <start> <end> <step> <other numbers...>`
+  (CSV-friendly output). Pure sweep engine in the library; 200-row
+  cap with the cap stated; list calculators and bad sweeps get
+  teaching messages.
+- **#20 Hints under every input.** Format + unit + code meanings
+  (hand-written where the label is not enough — sex/size/unit
+  codes, activity factors); hints live in the registry metadata,
+  so `--describe <id>` prints them too.
+- **#31 Batch from CSV.** GUI BATCH panel (typed paths — no
+  file-picker in this toolkit, stated honestly) + CLI `--batch`.
+  Hand-written CSV parser (quoted commas supported; no new
+  dependency). Bad rows are captured per-row; a header mismatch
+  is refused with the expected header named.
+- **#34 Linear Regression & Calibration.** New Statistics
+  calculator (registry 299 → 300): slope, intercept, r, R², means,
+  residuals, substituted sums in the steps, and calibration —
+  append one measured y and it predicts x = (y − b)/m. Known
+  answers from a textbook dataset (m = 0.6, b = 2.2, R² = 0.6).
+- **#46 Favourites + Recent.** ★ toggle per calculator, FAVOURITES
+  mode at the top of the rail (Alt+F) with the last 8 run as
+  Recent chips.
+- **#47 Ctrl+K quick search with synonyms.** Ctrl+K (or `/`)
+  focuses search; 80+-entry synonym table (40+ pairs) with
+  ranking exact name > synonym > description.
+- **#48 Remembered inputs.** Reopening a calculator restores its
+  last-used values; RESET restores the smart defaults.
+- **#50 Smart defaults everywhere.** Fields open on visible,
+  editable defaults (teaching examples; gas laws at STP —
+  273.15 K / 1 atm / 22.414 L; dates default to today where they
+  did before). AUDIT.md addendum lists the notable ones.
+- **Settings file** (shared by #1/#46/#48):
+  `%APPDATA%\CalcDex\settings.txt`, a documented line format.
+  A corrupt or missing file can never break startup.
+- **Tooltips for everything (standing rule).** Every button,
+  toggle, field, chip and history control carries a
+  plain-words tooltip. All buttons/selectables are built ONLY
+  through helper constructors that require a tooltip argument,
+  and tests/tooltips.rs scans the GUI source to keep it so.
+- **Full command-line support (standing rule).** CLI gains
+  `--describe`, `--example`, `--vary`, `--batch`, `--sig-figs`,
+  `--favourite` / `--unfavourite` / `--favourites`. CLI runs now
+  also write remembered inputs + recent to the shared settings
+  file. `docs/PARITY.md` is now a full GUI-vs-CLI parity table.
+  One CLI behaviour change: `--search` is now the ranked synonym
+  search (same engine as the window), so result order/content for
+  a query follows the ranking instead of registry order.
+- All v0.2.0 behaviours carry over (Design 3 layout, history
+  rail, 299 known-answer vectors + the new regression vectors),
+  except the keypad (next item).
+- **Removed: the on-screen keypad.** It made the window contents
+  uneven. The keypad UI, its focus tracking and its library code
+  are gone; the centre column now spans its full width evenly
+  (form fields widened). Keyboard flow is unchanged: type in the
+  fields, Enter calculates, Alt+ switches modes, Ctrl+K searches. The new GUI panels are **Unverified** on a real
+  Windows machine until a field run — fresh v0.3.0 captures are on
+  the README list.
+
+
 ## 0.2.0 — 2026-10-25
 
 The **Design 3** release — the layout SEAN picked from the eight
@@ -25,14 +104,8 @@ CLI and every result are exactly as audited at 0.1.2.
   (large green type) at the top of the centre; the full result
   text — formula, substituted values, result — sits in the
   STEPS / FULL RESULT footer underneath, complete and scrollable.
-- **Big on-screen keypad.** Digits, decimal point, +/-, DEL, C, a
-  contextual separator (`/` for date fields, `,` for list fields)
-  and `=` (Calculate). Keys type into the last field clicked, keys
-  that make no sense for that field are greyed out, and keyboard
-  typing works as before — a teacher can run a whole calculation
-  with the mouse alone. Enter also calculates. The keypad editing
-  logic is a tested pure function in the library
-  (`pad_apply`/`pad_key_allowed`, tests/v020.rs).
+- **On-screen keypad** (removed in v0.3.0 — it made the window
+  contents uneven).
 - **History rail (right).** The calculation log is docked as a
   right-hand rail — newest first, RE-OPEN restores calculator +
   inputs, CLEAR LOG, count in the header. Below a 1100 pt window

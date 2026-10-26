@@ -63,7 +63,6 @@ Dark "Terminal" theme, exactly SEAN's Purgeon Terminal colours:
 near-black background `#0c0c0c`, panels `#121212`, phosphor-green
 accent `#4ade80`, Cascadia Mono type, sharp corners everywhere.
 
-
 ## How to use it (window)
 
 Since v0.2.0 the window uses the **Design 3** layout SEAN picked
@@ -86,17 +85,11 @@ history rail — the pattern Microsoft's Calculator app uses):
    the green **Today?** button beside any date box to fill in
    today's date (the Age calculator's End Date and the Countdown's
    From Date already start filled with today).
-4. **Keypad:** the big on-screen keypad types into the last box
-   you clicked — digits, decimal point, +/-, DEL and C, a `/` key
-   for date boxes (a `,` key for list boxes); keys that make no
-   sense for the box are greyed out. A whole calculation can be
-   run with the mouse alone, which suits a teacher projecting the
-   app. Your keyboard works everywhere too.
-5. Press **CALCULATE** (or the keypad's **=**, or Enter). The
+4. Press **CALCULATE** (or Enter). The
    result appears in the **Display** at the top of the centre in
    large green type, with the full formula and worked steps in the
    footer block underneath — nothing is cut down to one line.
-6. **History rail (right):** every result is saved there at once
+5. **History rail (right):** every result is saved there at once
    (see Calculation log below). RE-OPEN on an entry restores its
    calculator and inputs. On a narrow window the rail collapses —
    below 1100 points wide the header **LOG** button shows the same
@@ -121,10 +114,98 @@ Dates on the command line are one argument in MM/DD/YYYY form, just
 like the window (the old six-number form `1988 4 23 2026 10 25`
 still works and gives the identical answer).
 
+More command-line tools (v0.3.0 — everything in the window has a
+command-line counterpart; see `docs/PARITY.md` for the full table):
+
+```
+CalcDex --describe bmi
+CalcDex bmi --example
+CalcDex compound-interest --vary 1 0 10 2.5 1000 10
+CalcDex --batch compound-interest in.csv out.csv
+CalcDex --sig-figs 3 compound-interest 1000 5 10
+CalcDex --favourite bmi
+CalcDex --favourites
+```
+
 Numbers go in the same order as the labelled boxes in the window.
 For unit converters the two extra numbers pick the units from the
 numbered list shown in that calculator's description.
 `CalcDex --help` explains the rest.
+
+## New in v0.3.0 — Batch 1 of the 50-enhancement program
+
+Ten enhancements (program items 1, 11, 16, 20, 31, 34, 46, 47, 48,
+50), every one of them in the window AND on the command line:
+
+- **Significant-figures mode (1).** The header's SIG FIGS selector
+  (Off / 2 / 3 / 4 / 5 / 6) adds a rounded showing of the result
+  headline next to the full-precision answer — counted correctly
+  (0.00456 to 3 figures stays 0.00456; 1628.89 becomes 1.63e3, so
+  the count is never ambiguous). Display only: the stored result
+  and the log always keep full precision. CLI: `--sig-figs 3`.
+- **Try an example (11).** Every calculator has a TRY AN EXAMPLE
+  button that fills in a worked teaching example and runs it at
+  once. CLI: `CalcDex bmi --example`.
+- **Vary one input (16).** The VARY section under the form sweeps
+  one input across start/end/step and tables the results (200-row
+  cap, stated in the panel). CLI:
+  `CalcDex compound-interest --vary 1 0 10 2.5 1000 10` (the field
+  is numbered from 0, as in `--describe`; the remaining numbers are
+  the other inputs in order).
+- **Hints under every input (20).** Every field shows what format
+  and unit it wants — and what the codes mean where a field takes
+  codes (sex codes, unit numbers, activity factors). CLI:
+  `CalcDex --describe bmi` prints them too.
+- **Batch from CSV (31).** The header BATCH panel (or
+  `CalcDex --batch <id> <input.csv> <output.csv>`) runs one
+  calculator over a whole file. The header row names the fields in
+  order — for Compound Interest that is:
+
+  ```
+  Principal P,Annual rate %,Years
+  1000,5,10
+  2000,10,5
+  ```
+
+  Each output row is the inputs plus the result headline, or
+  `ERROR: ...` — one bad row never stops the batch. (In the window
+  the file paths are typed: this toolkit has no file-picker
+  dialog.) For list calculators the header is the single list
+  label and each row's cells are the list values.
+- **Linear Regression & Calibration (34).** A new Statistics
+  calculator: enter (x, y) pairs and get slope, intercept, r, R²,
+  means, residuals, and the working (n, Σx, Σy, Σxy, Σx²). Add one
+  extra value at the end — a measured y — and it predicts the x
+  that produced it, x = (y − b) / m. Registry now 300 calculators.
+- **Favourites + Recent (46).** The ★ FAVOURITE button on any
+  calculator stars it into the FAVOURITES mode at the top of the
+  rail (Alt+F), which also shows your last 8 calculators as Recent
+  chips. CLI: `--favourite bmi`, `--unfavourite bmi`,
+  `--favourites`.
+- **Ctrl+K quick search with synonyms (47).** Ctrl+K (or `/`)
+  jumps to search from anywhere; search understands everyday words
+  — "home loan" finds the mortgage calculator, "bmi" finds Body
+  Mass Index — and ranks exact names first. 40+ synonym pairs.
+- **Remembered inputs (48).** Reopening a calculator restores the
+  values you last used in it; RESET puts the smart defaults back.
+- **Smart defaults (50).** Every field opens on a realistic,
+  visible, editable default (the teaching examples double as the
+  defaults): today in date fields, standard temperature/pressure
+  in the gas laws (273.15 K, 1 atm, 22.414 L), g = 9.80665 m/s²
+  inside the physics formulas, sane 0%/100% bounds elsewhere. The
+  notable ones are listed in `docs/AUDIT.md`.
+
+**Tooltips:** every button, toggle, field and key in the window
+has a plain-words tooltip saying what it does — no exceptions
+(enforced by
+construction in the code and checked by a test).
+
+**Settings file:** favourites, recent, remembered inputs and the
+sig-figs choice live in `%APPDATA%\CalcDex\settings.txt` (plain
+text, format documented in the file's code). The window and the
+command line read and write the SAME file — it is the shared
+source of truth, so a calculator you star or run on the command
+line is starred and remembered in the window too.
 
 ## Calculation log
 
@@ -157,8 +238,8 @@ calculations) can be found again later:
 
 Releases carry exactly two files, as always:
 
-1. `CalcDex-Setup-0.2.0.exe` — the installer (per-user, no admin).
-2. `CalcDex-0.2.0-portable.zip` — the portable build: just the .exe
+1. `CalcDex-Setup-0.3.0.exe` — the installer (per-user, no admin).
+2. `CalcDex-0.3.0-portable.zip` — the portable build: just the .exe
    plus the license and a short note. Unzip and run.
 
 The program is unsigned (no code-signing certificate) — Windows may
@@ -187,9 +268,10 @@ automatically; RE-OPEN restores an entry's calculator and inputs,
 CLEAR LOG empties the log. Timestamps are UTC.*
 
 **Captures still needed (real ones only, no placeholders):** a fresh
-main-window shot of **v0.2.0** showing the Design 3 layout (mode
-rail, keypad, display, history rail), ideally one at full width and
-one narrow enough that the history rail has collapsed.
+main-window shot of **v0.3.0** showing the Design 3 layout with the
+Batch 1 features (mode rail, display, history rail, hints
+under the fields), ideally one at full width and one narrow enough
+that the history rail has collapsed.
 
 ## Limitations (honest)
 
