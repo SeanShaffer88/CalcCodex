@@ -88,7 +88,7 @@ pub fn register(v: &mut Vec<Calc>) {
     // ---- Fractions (numerator, denominator pairs as fixed 4-input where needed) ----
     reg(v, Calc::new("fraction-simplify", "Simplify a Fraction", "Math",
         "Reduce a fraction to lowest terms by dividing top and bottom by their greatest common divisor (GCD).", &["Numerator", "Denominator"],
-        |x| { let (p,q)=(a(x,0) as i64, a(x,1) as i64); chk(a(x,0)==p as f64 && a(x,1)==q as f64, "Use whole numbers for the numerator and denominator.")?; chk(q!=0,"The denominator cannot be zero.")?; let g=gcd_i(p,q).max(1); let (np,nq)=(p/g, q/g); let sign=if nq<0 {-1} else {1}; Ok(format!("{}/{} simplifies to {}/{} (GCD = {}). Whole part: {}.", p,q, sign*np, sign*nq, g, np/nq)) }));
+        |x| { let (p,q)=(a(x,0) as i64, a(x,1) as i64); chk(a(x,0)==p as f64 && a(x,1)==q as f64, "Use whole numbers for the numerator and denominator.")?; chk(q!=0,"The denominator cannot be zero.")?; let g=gcd_i(p,q).max(1); let (np,nq)=norm_frac(p/g, q/g); Ok(format!("{}/{} simplifies to {}/{} (GCD = {}). Whole part: {}.", p,q, np, nq, g, np/nq)) }));
     reg(
         v,
         Calc::new(
@@ -142,12 +142,12 @@ pub fn register(v: &mut Vec<Calc>) {
                 let p = (a(x, 0) * a(x, 2)) as i64;
                 let q = (a(x, 1) * a(x, 3)) as i64;
                 let g = gcd_i(p, q).max(1);
+                let (rp, rq) = norm_frac(p / g, q / g);
                 Ok(format!(
-                    "Result: {}/{} = {} (decimal {}).",
-                    p / g,
-                    q / g,
-                    n((p / g) as f64),
-                    nd(p as f64 / q as f64, 6)
+                    "Result: {}/{} (decimal {}).",
+                    rp,
+                    rq,
+                    nd(rp as f64 / rq as f64, 6)
                 ))
             },
         ),
@@ -173,11 +173,12 @@ pub fn register(v: &mut Vec<Calc>) {
                 let p = (a(x, 0) * a(x, 3)) as i64;
                 let q = (a(x, 1) * a(x, 2)) as i64;
                 let g = gcd_i(p, q).max(1);
+                let (rp, rq) = norm_frac(p / g, q / g);
                 Ok(format!(
                     "Result: {}/{} (decimal {}).",
-                    p / g,
-                    q / g,
-                    nd(p as f64 / q as f64, 6)
+                    rp,
+                    rq,
+                    nd(rp as f64 / rq as f64, 6)
                 ))
             },
         ),
@@ -188,11 +189,16 @@ pub fn register(v: &mut Vec<Calc>) {
             "fraction-to-decimal",
             "Fraction / Mixed Number to Decimal & Percent",
             "Math",
-            "Decimal = whole + numerator / denominator. Percent = decimal x 100.",
+            "Decimal = whole + numerator / denominator (a negative whole part makes the fraction part negative too, so -1 and 1/2 means -1.5). Percent = decimal x 100.",
             &["Whole part (0 if none)", "Numerator", "Denominator"],
             |x| {
                 nz(a(x, 2), "The denominator")?;
-                let d = a(x, 0) + a(x, 1) / a(x, 2);
+                let frac = a(x, 1) / a(x, 2);
+                let d = if a(x, 0) < 0.0 {
+                    a(x, 0) - frac.abs()
+                } else {
+                    a(x, 0) + frac
+                };
                 Ok(format!(
                     "Decimal: {}. Percent: {}%.",
                     nd(d, 8),
@@ -207,7 +213,7 @@ pub fn register(v: &mut Vec<Calc>) {
             "decimal-to-fraction",
             "Decimal to Fraction",
             "Math",
-            "Writes a decimal as a fraction over a power of ten, then simplifies with the GCD.",
+            "Writes a decimal as a fraction over a power of ten, then simplifies with the GCD. Up to 9 decimal places are used; a longer decimal is rounded at the 9th place first.",
             &["Decimal"],
             |x| {
                 let mut den = 1i64;
@@ -299,10 +305,20 @@ pub fn register(v: &mut Vec<Calc>) {
             &["Number x", "Root n"],
             |x| {
                 nz(a(x, 1), "The root n")?;
-                chk(
-                    !(a(x, 0) < 0.0 && a(x, 1) % 2.0 == 0.0),
-                    "An even root of a negative number is not real.",
-                )?;
+                if a(x, 0) < 0.0 {
+                    let ni = a(x, 1) as i64;
+                    chk(
+                        a(x, 1) == ni as f64 && ni % 2 != 0,
+                        "A negative number has a real root only for odd whole-number roots (3, 5, 7, ...). Even or non-whole roots of a negative number are not real.",
+                    )?;
+                    let r = -((-a(x, 0)).powf(1.0 / a(x, 1)));
+                    return Ok(format!(
+                        "The {}-th root of {} = {}.",
+                        n(a(x, 1)),
+                        n(a(x, 0)),
+                        nd(r, 8)
+                    ));
+                }
                 let r = a(x, 0).powf(1.0 / a(x, 1));
                 finite(r)?;
                 Ok(format!(
@@ -540,16 +556,30 @@ pub fn register(v: &mut Vec<Calc>) {
             "ratio",
             "Ratio Simplify & Scale",
             "Math",
-            "Simplifies A:B by the GCD and scales A:B so the first part becomes the target.",
+            "Simplifies A:B by the GCD (decimal parts like 1.5 are scaled up to whole numbers first, so 1.5:2.5 correctly becomes 3:5) and scales A:B so the first part becomes the target.",
             &["Ratio part A", "Ratio part B", "Scale A to (target)"],
             |x| {
-                let g = gcd_i(a(x, 0) as i64, a(x, 1) as i64).max(1);
+                // Scale both parts by a power of ten until they are whole
+                // numbers (up to 6 decimal places), then use the GCD.
+                let mut scale = 1.0f64;
+                for _ in 0..6 {
+                    if (a(x, 0) * scale).fract() == 0.0 && (a(x, 1) * scale).fract() == 0.0 {
+                        break;
+                    }
+                    scale *= 10.0;
+                }
+                let (ia, ib) = (
+                    (a(x, 0) * scale).round() as i64,
+                    (a(x, 1) * scale).round() as i64,
+                );
+                let g = gcd_i(ia, ib).max(1);
                 nz(a(x, 0), "Ratio part A (for scaling)")?;
+                nz(a(x, 0) + a(x, 1), "A + B (for the share)")?;
                 let k = a(x, 2) / a(x, 0);
                 Ok(format!(
                     "Simplified ratio: {}:{}. Scaled to A={}: {}:{}. A share of total: {}%.",
-                    (a(x, 0) as i64) / g,
-                    (a(x, 1) as i64) / g,
+                    ia / g,
+                    ib / g,
                     n(a(x, 2)),
                     n(a(x, 2)),
                     nd(a(x, 1) * k, 4),
@@ -564,11 +594,12 @@ pub fn register(v: &mut Vec<Calc>) {
             "proportion",
             "Proportion / Cross-Multiply (Solve for x)",
             "Math",
-            "If A/B = x/D then x = A*D/B. Also shows x for A/B = C/x.",
-            &["A", "B", "D"],
+            "Solves a proportion in either standard form. Form 1: A/B = x/C, so x = A x C / B. Form 2: A/B = C/x, so x = B x C / A. The third input is C in both forms; both answers are shown so you can use the one that matches your equation.",
+            &["A", "B", "C (third known value)"],
             |x| {
-                nz(a(x, 1), "B")?;
-                Ok(format!("A/B = x/D  ->  x = {} x {} / {} = {}.\nA/B = C/x form with C=A: x = B = {} (check your setup).", n(a(x,0)), n(a(x,2)), n(a(x,1)), nd(a(x,0)*a(x,2)/a(x,1),6), n(a(x,1))))
+                nz(a(x, 0), "A (for form 2)")?;
+                nz(a(x, 1), "B (for form 1)")?;
+                Ok(format!("Form 1 (A/B = x/C): x = {} x {} / {} = {}.\nForm 2 (A/B = C/x): x = {} x {} / {} = {}.", n(a(x,0)), n(a(x,2)), n(a(x,1)), nd(a(x,0)*a(x,2)/a(x,1),6), n(a(x,1)), n(a(x,2)), n(a(x,0)), nd(a(x,1)*a(x,2)/a(x,0),6)))
             },
         ),
     );
@@ -1102,6 +1133,16 @@ pub fn register(v: &mut Vec<Calc>) {
     );
 }
 
+/// Normalize a fraction so the denominator is positive (sign moves to
+/// the numerator): 3/-2 becomes -3/2.
+fn norm_frac(p: i64, q: i64) -> (i64, i64) {
+    if q < 0 {
+        (-p, -q)
+    } else {
+        (p, q)
+    }
+}
+
 fn frac_op(x: &[f64], sign: f64, sym: &str) -> Result<String, String> {
     chk(
         a(x, 1) != 0.0 && a(x, 3) != 0.0,
@@ -1110,7 +1151,7 @@ fn frac_op(x: &[f64], sign: f64, sym: &str) -> Result<String, String> {
     let p = (a(x, 0) * a(x, 3) + sign * a(x, 2) * a(x, 1)) as i64;
     let q = (a(x, 1) * a(x, 3)) as i64;
     let g = gcd_i(p, q).max(1);
-    let (rp, rq) = (p / g, q / g);
+    let (rp, rq) = norm_frac(p / g, q / g);
     Ok(format!(
         "Result: {}/{} {} {}/{} = {}/{} (decimal {}).",
         a(x, 0) as i64,

@@ -175,7 +175,7 @@ pub fn register(v: &mut Vec<Calc>) {
             "ideal-gas-pressure",
             "Ideal Gas Law (Solve Pressure)",
             "Chemistry",
-            "PV = nRT, so P = nRT / V. R = 0.082057 L atm/(mol K) (= 8.314 J/(mol K)) (= 8.314 J/(mol K) in SI). T must be kelvin (C + 273.15).",
+            "PV = nRT, so P = nRT / V. R = 0.082057 L atm/(mol K) (= 8.314 J/(mol K) in SI units). T must be kelvin (C + 273.15).",
             &["Moles n", "Temperature T (K)", "Volume V (L)"],
             |x| {
                 nz(a(x, 2), "Volume")?;
@@ -194,7 +194,7 @@ pub fn register(v: &mut Vec<Calc>) {
             "ideal-gas-volume",
             "Ideal Gas Law (Solve Volume)",
             "Chemistry",
-            "V = nRT / P. R = 0.082057 L atm/(mol K) (= 8.314 J/(mol K)) (= 8.314 J/(mol K) in SI).",
+            "V = nRT / P. R = 0.082057 L atm/(mol K) (= 8.314 J/(mol K) in SI units).",
             &["Moles n", "Temperature T (K)", "Pressure P (atm)"],
             |x| {
                 nz(a(x, 2), "Pressure")?;
@@ -211,7 +211,7 @@ pub fn register(v: &mut Vec<Calc>) {
             "ideal-gas-moles",
             "Ideal Gas Law (Solve Moles)",
             "Chemistry",
-            "n = PV / RT. R = 0.082057 L atm/(mol K) (= 8.314 J/(mol K)) (= 8.314 J/(mol K) in SI).",
+            "n = PV / RT. R = 0.082057 L atm/(mol K) (= 8.314 J/(mol K) in SI units).",
             &["Pressure P (atm)", "Volume V (L)", "Temperature T (K)"],
             |x| {
                 chk(a(x, 2) > 0.0, "Temperature in kelvin must be over 0.")?;

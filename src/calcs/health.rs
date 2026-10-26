@@ -82,8 +82,8 @@ pub fn register(v: &mut Vec<Calc>) {
         "US Navy method (women): BF% = 495 / (1.29579 - 0.35004 log10(waist+hip-neck) + 0.22100 log10(height)) - 450. All cm. ESTIMATE.", &["Waist (cm)", "Hip (cm)", "Neck (cm)", "Height (cm)"],
         |x| { chk(a(x,0)+a(x,1)>a(x,2),"Waist + hip must be bigger than neck for this formula.")?; let bf=495.0/(1.29579-0.35004*(a(x,0)+a(x,1)-a(x,2)).log10()+0.22100*a(x,3).log10())-450.0; Ok(format!("Body fat: {}%. Lean mass share: {}%.", nd(bf,2), nd(100.0-bf,1))) }));
     reg(v, Calc::new("ideal-weight-devine", "Ideal Weight (Devine Formula)", "Health",
-        "Devine: men 50 kg + 2.3 kg per inch over 5 ft; women 45.5 kg + 2.3 kg per inch over 5 ft. Enter sex code 1=male, 2=female, and height in cm. ESTIMATE.", &["Sex code (1 male, 2 female)", "Height (cm)"],
-        |x| { let inches=a(x,1)/2.54; let over=(inches-60.0).max(0.0); let iw=if a(x,0)==1.0 { 50.0+2.3*over } else if a(x,0)==2.0 { 45.5+2.3*over } else { return Err("Sex code must be 1 (male) or 2 (female).".into()) }; Ok(format!("Ideal weight (Devine): {} kg. (Height {} inches; {} inches over 5 ft.)", nd(iw,1), nd(inches,1), nd(over,1))) }));
+        "Devine: men 50 kg + 2.3 kg for each inch over 5 ft (minus 2.3 kg for each inch under 5 ft); women 45.5 kg +/- the same 2.3 kg per inch. Enter sex code 1=male, 2=female, and height in cm. ESTIMATE.", &["Sex code (1 male, 2 female)", "Height (cm)"],
+        |x| { let inches=a(x,1)/2.54; let over=inches-60.0; let iw=if a(x,0)==1.0 { 50.0+2.3*over } else if a(x,0)==2.0 { 45.5+2.3*over } else { return Err("Sex code must be 1 (male) or 2 (female).".into()) }; Ok(format!("Ideal weight (Devine): {} kg. (Height {} inches; {} inches {} 5 ft.)", nd(iw,1), nd(inches,1), nd(over.abs(),1), if over>=0.0 {"over"} else {"under"})) }));
     reg(v, Calc::new("water-intake", "Daily Water Intake Estimate", "Health",
         "Common guide: about 35 ml per kg of body weight per day (about 0.5 oz per lb). ESTIMATE — thirst, weather and activity matter more.", &["Weight (kg)"],
         |x| Ok(format!("About {} litres per day ({} ml). In US cups (240 ml): about {}.", nd(a(x,0)*35.0/1000.0,2), nd(a(x,0)*35.0,0), nd(a(x,0)*35.0/240.0,1)))));
@@ -91,7 +91,7 @@ pub fn register(v: &mut Vec<Calc>) {
         "Max HR ≈ 220 - age. Zones are % of max: fat burn ~60-70%, cardio ~70-80%, peak ~80-90%. ESTIMATE.", &["Age (years)"],
         |x| { let mx=220.0-a(x,0); Ok(format!("Max heart rate ≈ {} bpm.\nRecovery 50-60%: {}-{}\nFat burn 60-70%: {}-{}\nCardio 70-80%: {}-{}\nPeak 80-90%: {}-{}", nd(mx,0), nd(mx*0.5,0), nd(mx*0.6,0), nd(mx*0.6,0), nd(mx*0.7,0), nd(mx*0.7,0), nd(mx*0.8,0), nd(mx*0.8,0), nd(mx*0.9,0))) }));
     reg(v, Calc::new("karvonen", "Karvonen Heart Rate Target", "Health",
-        "Target = resting HR + intensity% x (max HR - resting HR). Max HR = 220 - age. Enter intensity as % (e.g. 70). ESTIMATE.", &["Age", "Resting heart rate (bpm)", "Intensity %"],
+        "Target = resting HR + intensity% x (max HR - resting HR). Max HR = 220 - age. Enter intensity as % (e.g. 70). ESTIMATE.", &["Age (years)", "Resting heart rate (bpm)", "Intensity %"],
         |x| { let mx=220.0-a(x,0); let t=a(x,1)+a(x,2)/100.0*(mx-a(x,1)); Ok(format!("Target heart rate at {}% (Karvonen): {} bpm. Heart-rate reserve: {} bpm.", n(a(x,2)), nd(t,0), nd(mx-a(x,1),0))) }));
     reg(v, Calc::new("pace", "Running/Walking Pace", "Health",
         "Pace = time / distance. Speed = distance / time. Enter distance in km and time in minutes.", &["Distance (km)", "Time (minutes)"],

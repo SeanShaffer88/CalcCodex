@@ -106,7 +106,7 @@ pub fn register(v: &mut Vec<Calc>) {
         |x| { let (y1,m1,d1)=valid_date(a(x,0),a(x,1),a(x,2))?; let (y2,m2,d2)=valid_date(a(x,3),a(x,4),a(x,5))?; let start=days_from_civil(y1,m1,d1).min(days_from_civil(y2,m2,d2)); let total=(days_from_civil(y2,m2,d2)-days_from_civil(y1,m1,d1)).abs(); let exact=count_business_days(start, total); Ok(format!("Total days: {}. Business days (Mon-Fri, exact count, not counting the start day, counting the end day if a weekday): {}.", total, exact)) }).with_dates(START_END_DATES));
     reg(v, Calc::new("dog-age", "Dog Age to Human Years", "Everyday",
         "Modern guide (AVMA): first year ≈ 15 human years, second adds 9 (24 total), then +5 per year. Enter whole years and pick size code for the older-dog adjustment: 1 small, 2 medium, 3 large (+5/+5/+6 per extra year used). ESTIMATE.", &["Dog age (years)", "Size code (1 small, 2 medium, 3 large)"],
-        |x| { chk(a(x,0)>0.0,"Age must be over 0.")?; let age=a(x,0); let extra=if a(x,1)==3.0 {6.0} else {5.0}; let h=if age<=1.0 { 15.0*age } else if age<=2.0 { 15.0+9.0*(age-1.0) } else { 24.0+extra*(age-2.0) }; Ok(format!("About {} human years. ESTIMATE.", nd(h,0))) }));
+        |x| { chk(a(x,0)>0.0,"Age must be over 0.")?; chk(a(x,1)==1.0 || a(x,1)==2.0 || a(x,1)==3.0, "Size code must be 1 (small), 2 (medium) or 3 (large).")?; let age=a(x,0); let extra=if a(x,1)==3.0 {6.0} else {5.0}; let h=if age<=1.0 { 15.0*age } else if age<=2.0 { 15.0+9.0*(age-1.0) } else { 24.0+extra*(age-2.0) }; Ok(format!("About {} human years. ESTIMATE.", nd(h,0))) }));
     reg(
         v,
         Calc::new(
@@ -116,6 +116,7 @@ pub fn register(v: &mut Vec<Calc>) {
             "Common guide: first year ≈ 15, second adds 9 (24 total), then +4 per year. ESTIMATE.",
             &["Cat age (years)"],
             |x| {
+                chk(a(x, 0) > 0.0, "Age must be over 0.")?;
                 let age = a(x, 0);
                 let h = if age <= 1.0 {
                     15.0 * age

@@ -254,7 +254,7 @@ pub fn register(v: &mut Vec<Calc>) {
     );
     reg(v, Calc::new("double-discount", "Double Discount (Two % Off in a Row)", "Finance",
         "Two discounts apply one after the other (not added): result = price x (1-d1/100) x (1-d2/100). Shows the single equivalent discount.", &["Original price", "First discount %", "Second discount %"],
-        |x| { let r=a(x,0)*(1.0-a(x,1)/100.0)*(1.0-a(x,2)/100.0); Ok(format!("Final price: {}. Total saved: {}. Equivalent single discount: {}%.", m(r), m(a(x,0)-r), nd((1.0-r/a(x,0))*100.0,4))) }));
+        |x| { let r=a(x,0)*(1.0-a(x,1)/100.0)*(1.0-a(x,2)/100.0); if a(x,0)==0.0 { return Ok("Final price: 0. Total saved: 0. (The starting price was 0, so there is no equivalent discount to compute.)".into()); } Ok(format!("Final price: {}. Total saved: {}. Equivalent single discount: {}%.", m(r), m(a(x,0)-r), nd((1.0-r/a(x,0))*100.0,4))) }));
     reg(
         v,
         Calc::new(
@@ -388,6 +388,10 @@ pub fn register(v: &mut Vec<Calc>) {
             "EAR = (1 + nominal/n)^n - 1, as a %.",
             &["Nominal annual rate %", "Compounds per year n"],
             |x| {
+                chk(
+                    a(x, 1) >= 1.0,
+                    "Compounds per year must be at least 1 (e.g. 12 for monthly, 4 for quarterly, 1 for yearly).",
+                )?;
                 Ok(format!(
                     "Effective annual rate: {}%.",
                     nd(
@@ -407,7 +411,10 @@ pub fn register(v: &mut Vec<Calc>) {
             "Years to double ≈ 72 / annual rate %. Also computes the exact value ln2/ln(1+r).",
             &["Annual rate %"],
             |x| {
-                nz(a(x, 0), "The rate")?;
+                chk(
+                    a(x, 0) > 0.0,
+                    "The rate must be over 0% — at 0% or less, money never doubles.",
+                )?;
                 Ok(format!(
                     "Rule of 72 estimate: {} years. Exact doubling time: {} years.",
                     nd(72.0 / a(x, 0), 3),

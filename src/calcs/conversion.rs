@@ -42,6 +42,10 @@ fn linear(
                 "To unit (number from list)",
             ],
             move |x| {
+                chk(
+                    a(x, 1) == (a(x, 1) as i64) as f64 && a(x, 2) == (a(x, 2) as i64) as f64,
+                    "Unit numbers must be whole numbers from the list in the description (e.g. 0, 1, 2 — not 1.5).",
+                )?;
                 let fi = a(x, 1) as i64;
                 let ti = a(x, 2) as i64;
                 chk(
@@ -313,6 +317,7 @@ pub fn register(v: &mut Vec<Calc>) {
     reg(v, Calc::new("convert-temperature", "Temperature Converter", "Conversion",
         "Inputs: value, FROM unit number, TO unit number. Units: 0=Celsius, 1=Fahrenheit, 2=Kelvin. Formulas: F = C x 9/5 + 32; K = C + 273.15.", &["Value", "From unit (0 C, 1 F, 2 K)", "To unit (0 C, 1 F, 2 K)"],
         |x| {
+            chk(a(x,1)==(a(x,1) as i64) as f64 && a(x,2)==(a(x,2) as i64) as f64, "Unit numbers must be whole numbers: 0, 1 or 2.")?;
             let f = a(x,1) as i64; let t = a(x,2) as i64;
             let c = match f { 0 => a(x,0), 1 => (a(x,0)-32.0)*5.0/9.0, 2 => a(x,0)-273.15, _ => return Err("From-unit must be 0, 1 or 2.".into()) };
             let (r, name) = match t { 0 => (c, "Celsius"), 1 => (c*9.0/5.0+32.0, "Fahrenheit"), 2 => (c+273.15, "Kelvin"), _ => return Err("To-unit must be 0, 1 or 2.".into()) };

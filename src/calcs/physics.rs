@@ -14,8 +14,8 @@ pub fn register(v: &mut Vec<Calc>) {
             "speed-from-distance-time",
             "Speed From Distance & Time",
             "Physics",
-            "speed = distance / time.",
-            &["Distance", "Time"],
+            "speed = distance / time. Use matching units: metres & seconds gives m/s, km & hours gives km/h.",
+            &["Distance (e.g. m or km)", "Time (e.g. s or h)"],
             |x| {
                 nz(a(x, 1), "Time")?;
                 Ok(format!("Speed = {} / {} = {}. Keep the units consistent (e.g. metres & seconds gives m/s).", n(a(x,0)), n(a(x,1)), nd(a(x,0)/a(x,1),6)))
@@ -28,8 +28,8 @@ pub fn register(v: &mut Vec<Calc>) {
             "distance-from-speed-time",
             "Distance From Speed & Time",
             "Physics",
-            "distance = speed x time.",
-            &["Speed", "Time"],
+            "distance = speed x time. Use matching units: m/s & seconds gives metres, km/h & hours gives km.",
+            &["Speed (e.g. m/s or km/h)", "Time (matching unit)"],
             |x| {
                 Ok(format!(
                     "Distance = {} x {} = {}.",
@@ -46,8 +46,8 @@ pub fn register(v: &mut Vec<Calc>) {
             "time-from-speed-distance",
             "Time From Speed & Distance",
             "Physics",
-            "time = distance / speed.",
-            &["Distance", "Speed"],
+            "time = distance / speed. Use matching units: metres / (m/s) gives seconds, km / (km/h) gives hours.",
+            &["Distance (e.g. m or km)", "Speed (matching unit)"],
             |x| {
                 nz(a(x, 1), "Speed")?;
                 Ok(format!(
@@ -66,9 +66,14 @@ pub fn register(v: &mut Vec<Calc>) {
             "Average Velocity",
             "Physics",
             "Average velocity = change in position / change in time = (x2 - x1) / (t2 - t1).",
-            &["Position x1", "Position x2", "Time t1", "Time t2"],
+            &[
+                "Position x1 (any unit)",
+                "Position x2 (same unit)",
+                "Time t1",
+                "Time t2 (same unit)",
+            ],
             |x| {
-                nz(a(x, 3) - a(x, 1), "t2 - t1")?;
+                nz(a(x, 3) - a(x, 2), "t2 - t1 (the two times must differ)")?;
                 Ok(format!(
                     "Average velocity = {}.",
                     nd((a(x, 1) - a(x, 0)) / (a(x, 3) - a(x, 2)), 6)
@@ -204,7 +209,7 @@ pub fn register(v: &mut Vec<Calc>) {
         ),
     );
     reg(v, Calc::new("power-physics", "Power (Work Over Time / Force x Velocity)", "Physics",
-        "Power = work / time. If you also give force x velocity it is the same number — this calc uses work & time, and shows watts and horsepower (1 hp = 745.7 W).", &["Work (J)", "Time (s)"],
+        "Power = work / time. (Power can also be force x velocity when you know those instead.) Shows watts, horsepower (1 hp = 745.7 W) and kilowatts.", &["Work (J)", "Time (s)"],
         |x| { nz(a(x,1),"Time")?; let p=a(x,0)/a(x,1); Ok(format!("Power = {} W ({} hp, {} kW).", nd(p,4), nd(p/745.7,4), nd(p/1000.0,4))) }));
     reg(
         v,

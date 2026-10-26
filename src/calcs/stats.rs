@@ -1,7 +1,7 @@
 //! Statistics calculators (Omni: Statistics). List calculators: enter
 //! any number of values (GUI: one comma/space separated field; CLI: one
 //! argument per value).
-use crate::{a, factorial, n, nd, norm_cdf, nz, p_from_z, Calc};
+use crate::{a, chk, factorial, n, nd, norm_cdf, nz, p_from_z, Calc};
 
 fn reg(v: &mut Vec<Calc>, c: Calc) {
     v.push(c);
@@ -215,6 +215,10 @@ pub fn register(v: &mut Vec<Calc>) {
             ],
             |x| {
                 nz(a(x, 0), "Margin of error")?;
+                chk(
+                    a(x, 1) > 0.0 && a(x, 1) < 1.0,
+                    "The proportion p must be between 0 and 1 (not including 0 or 1 — use 0.5 if you are unsure).",
+                )?;
                 let req = (a(x, 2).powi(2) * a(x, 1) * (1.0 - a(x, 1)) / a(x, 0).powi(2)).ceil();
                 Ok(format!("Sample size needed: {} people/responses.", req))
             },
