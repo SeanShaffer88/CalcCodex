@@ -1,5 +1,65 @@
 # Changelog — CalcDex
 
+## 0.1.2 — 2026-10-25
+
+The readability + responsive + full-audit release, from SEAN's field
+test of 0.1.1. (0.1.1 itself is FIELD-VERIFIED: SEAN's screenshots
+show the merged date fields, format hints, Today? buttons, the
+pre-filled End Date, the calculation log view with its LOG (1)
+count, RE-OPEN and CLEAR LOG, and Icon 1 in the title bar; his Age
+run 06/04/1977 → 10/26/2026 = 49 years / 18,041 days / 2,577 weeks
+was independently re-checked and is exactly correct. His two
+captures are now in `docs/screenshots/`.)
+
+- **Left column readability:** list text is now the main text
+  colour at 13 pt (measured 12.15:1 contrast on the panel — WCAG AA
+  asks 4.5:1; the old muted-grey labels measured 4.36:1), category
+  headers are green and bold, rows are taller, the selected row has
+  a green background, green text AND a marker bar on its left edge
+  (selection is never colour-alone), hover is clearly visible, and
+  long names stay on one line with an ellipsis + full-name tooltip
+  instead of wrapping mid-name.
+- **Responsive window:** the left panel is user-resizable
+  (190–400 pt); the detail pane scrolls vertically and its input
+  rows reflow from the available width (labels 38%, fields take the
+  rest, capped) so nothing clips off the right edge at the new
+  760 × 520 minimum size or at 150–200% text zoom; the search box
+  stretches with the panel. On-Windows resize behaviour is
+  Partially Verified (by construction + code review) until SEAN's
+  check — see `docs/AUDIT.md` for the layout mechanisms.
+- **Full audit of all 299 calculators** (usability, accuracy,
+  context, accessibility) — full report in `docs/AUDIT.md`. Known-
+  answer test coverage went from 67 of 299 calculators to **299 of
+  299** (expected values computed independently). Formula bugs
+  fixed, each pinned by a regression test:
+  - Fraction Multiply printed the numerator as a bogus "= value"
+    (2/3 × 3/4 showed "= 1"; now "Result: 1/2 (decimal 0.5)").
+  - Average Velocity's divide-by-zero guard tested the wrong
+    inputs: equal times printed an infinite velocity, and some
+    valid problems got a false error. Guard now tests t2 − t1.
+  - Ideal Weight (Devine) clamped heights under 5 ft to the 5 ft
+    weight (a 4′10″ man got 50.0 kg; the signed formula gives
+    45.4 kg).
+  - Ratio truncated decimal parts before simplifying (1.5 : 2.5
+    became 1 : 2; now correctly 3 : 5).
+  - Fraction to Decimal mishandled negative mixed numbers
+    (−1 and 1/2 gave −0.5; now −1.5).
+  - Nth Root rejected odd roots of negatives (cube root of −27
+    now = −3, with a teaching error for even/non-whole roots).
+  - Silent-garbage edge cases now teach instead: Double Discount
+    at price 0 (was "NaN%"), Effective Rate at n = 0, Rule of 72
+    at a negative rate, Sample Size at p = 0 or 1 (was "0 people
+    needed"), Dog Age with an invalid size code, and fractional
+    converter unit numbers (1.9 was silently read as unit 1).
+  - Proportion's second output line was self-contradictory; both
+    standard forms are now computed and labelled. Fraction results
+    no longer print negative denominators (3/-2 → −3/2).
+  - Wording/labels: Speed, Distance and Time calculators state
+    their unit assumptions on the labels; Karvonen's "Age" is now
+    "Age (years)"; the ideal-gas descriptions no longer repeat the
+    gas constant twice; Decimal → Fraction documents its
+    9-decimal-place precision limit.
+
 ## 0.1.1 — 2026-10-25
 
 Renamed CalcCodex → **CalcDex** (program, project, and repo) and the

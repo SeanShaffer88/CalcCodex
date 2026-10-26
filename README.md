@@ -140,10 +140,29 @@ this build. Check the SHA-256 in the release notes to be sure.
 
 ## Screenshots
 
-To be confirmed — v0.1.0 was field-verified on SEAN's machine, and
-fresh real captures from SEAN's machine are needed for v0.1.1: the
-Age calculator with a merged Birth Date / End Date field, and the
-Calculation Log view. (No placeholder pictures, ever.)
+Real captures from SEAN's machine, taken during the v0.1.1 field
+test (2026-10-25). They show the OLD left column — v0.1.2 makes the
+lists brighter, larger, and single-line; a fresh main-window capture
+after the readability fix is still needed.
+
+![Age Calculator in v0.1.1 — merged Birth Date and End Date fields with format hints and Today? buttons](docs/screenshots/age-calculator.png)
+
+*Age Calculator (v0.1.1 capture): one MM/DD/YYYY box per date, the
+format hint under each field, and a Today? button beside each date.
+The result shown — 06/04/1977 to 10/26/2026 = 49 years / 18,041
+days / 2,577 weeks — was independently re-checked and is exactly
+right.*
+
+![Calculation Log in v0.1.1](docs/screenshots/calculation-log.png)
+
+*Calculation Log (v0.1.1 capture): every calculation is saved
+automatically; RE-OPEN restores an entry's calculator and inputs,
+CLEAR LOG empties the log. Timestamps are UTC.*
+
+**Captures still needed (real ones only, no placeholders):** a fresh
+main-window shot of v0.1.2 showing the brighter left column, ideally
+one at the minimum window size and one with the left panel dragged
+wider.
 
 ## Limitations (honest)
 

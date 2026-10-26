@@ -97,3 +97,10 @@ Segoe-font loading pattern.
 compounding, so the headline example `compound-interest 1000 5 10`
 = 1628.89 matches Omni's common default. Monthly compounding lives
 in `compound-interest-monthly-deposit`; no silent assumption.
+
+## 2026-10-25 — Future layout: Design 3 picked
+SEAN picked **Design 3** from the 8 research mockups as CalcDex's
+future layout (2026-10-25). The redesign is its own slice AFTER
+v0.1.2 — v0.1.2 deliberately keeps the current layout and only
+carries the readability / contrast / responsive work, which is
+written generally so it carries forward into Design 3.
