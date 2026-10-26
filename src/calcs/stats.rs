@@ -1,6 +1,7 @@
 //! Statistics calculators (Omni: Statistics). List calculators: enter
 //! any number of values (GUI: one comma/space separated field; CLI: one
 //! argument per value).
+use crate::features::{linear_regression, regression_predict_x};
 use crate::{a, chk, factorial, n, nd, norm_cdf, nz, p_from_z, Calc};
 
 fn reg(v: &mut Vec<Calc>, c: Calc) {
@@ -236,4 +237,43 @@ pub fn register(v: &mut Vec<Calc>) {
     reg(v, Calc::new("weighted-average", "Weighted Average (Value, Weight Pairs)", "Statistics",
         "Enter pairs: value, weight, value, weight... Result = sum(value x weight) / sum(weights).", &["Pairs: value, weight, ... (list)"],
         |x| { let mut num=0.0; let mut den=0.0; let mut i=0; while i+1<x.len() { num+=x[i]*x[i+1]; den+=x[i+1]; i+=2; } nz(den,"Total weight")?; Ok(format!("Weighted average: {}.", nd(num/den,6))) }).pair_mode());
+    reg(v, Calc::new("linear-regression", "Linear Regression & Calibration", "Statistics",
+        "Least-squares line y = m x + b from (x, y) pairs, with correlation r and R\u{b2}. Enter pairs: x, y, x, y, ... Optionally add ONE final value — a measured y — and the calibration part predicts the x that produced it: x = (y - b) / m. Steps show the substituted sums (n, \u{3a3}x, \u{3a3}y, \u{3a3}xy, \u{3a3}x\u{b2}).", &["Pairs: x, y, ... plus optional final measured y (list)"],
+        |x| {
+            // Pairs, plus an optional odd trailing value = measured y.
+            let (data, measured) = if x.len() % 2 == 1 {
+                (&x[..x.len()-1], Some(x[x.len()-1]))
+            } else {
+                (x, None)
+            };
+            if data.len() < 4 {
+                return Err("Linear regression needs at least 2 (x, y) points — that is 4 numbers.".into());
+            }
+            let mut xs = Vec::new();
+            let mut ys = Vec::new();
+            let mut i = 0;
+            while i + 1 < data.len() { xs.push(data[i]); ys.push(data[i+1]); i += 2; }
+            let reg = linear_regression(&xs, &ys)?;
+            let residuals: Vec<String> = xs.iter().zip(ys.iter())
+                .map(|(xv, yv)| nd(yv - (reg.slope * xv + reg.intercept), 4))
+                .collect();
+            let mut out = format!(
+                "Linear regression (n = {} points): y = {} x + {}.\nSlope m = {}. Intercept b = {}.\nCorrelation r = {}. R\u{b2} = {} ({}% of the variance in y is explained by x).\nMeans: x\u{304} = {}, y\u{304} = {}.\nResiduals (y - predicted y): {}.\nSteps: n = {}, \u{3a3}x = {}, \u{3a3}y = {}, \u{3a3}xy = {}, \u{3a3}x\u{b2} = {}. m = (n\u{3a3}xy - \u{3a3}x\u{3a3}y) / (n\u{3a3}x\u{b2} - (\u{3a3}x)\u{b2}) = {}. b = y\u{304} - m x\u{304} = {}.",
+                reg.n, nd(reg.slope, 6), nd(reg.intercept, 6),
+                nd(reg.slope, 6), nd(reg.intercept, 6),
+                nd(reg.r, 6), nd(reg.r2, 6), nd(reg.r2 * 100.0, 2),
+                nd(reg.mean_x, 6), nd(reg.mean_y, 6),
+                residuals.join(", "),
+                reg.n, nd(reg.sum_x, 6), nd(reg.sum_y, 6), nd(reg.sum_xy, 6), nd(reg.sum_xx, 6),
+                nd(reg.slope, 6), nd(reg.intercept, 6)
+            );
+            match measured {
+                Some(y) => match regression_predict_x(&reg, y) {
+                    Ok(px) => out.push_str(&format!("\nCalibration: measured y = {} -> predicted x = ({} - {}) / {} = {}.", nd(y, 6), nd(y, 6), nd(reg.intercept, 6), nd(reg.slope, 6), nd(px, 6))),
+                    Err(e) => out.push_str(&format!("\nCalibration: {e}")),
+                },
+                None => out.push_str("\nCalibration: add one extra value at the end of the list (a measured y) and CalcDex predicts its x = (y - b) / m."),
+            }
+            Ok(out)
+        }).pair_tail_mode());
 }
