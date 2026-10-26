@@ -1,4 +1,9 @@
-# Roadmap — what v0.1 does NOT do yet (honest list)
+# Roadmap — what v0.1.1 does NOT do yet (honest list)
+
+Done since v0.1 (removed from the gap list): merged MM/DD/YYYY date
+fields with Today? buttons and end-date wording, CLI one-argument
+dates, and the persistent calculation log (v0.1.1, from SEAN's field
+test).
 
 Nothing below was silently dropped. Each item is a real Omni/Nutilz
 calculator family that needs more than a closed-form formula, or a

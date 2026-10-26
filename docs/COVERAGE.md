@@ -1,4 +1,4 @@
-# Coverage — CalcCodex v0.1 vs the two source sites
+# Coverage — CalcDex v0.1 vs the two source sites
 
 Counts in this file are the **registered calculator count proven by
 the registry test** (`tests/known_answers.rs::registry_is_big_and_unique`
@@ -25,7 +25,7 @@ gate transcript).
 Omni inflates its count with one page per *pair* or per *item*:
 
 - ~Hundreds of unit pages ("inches to cm", "cm to inches", "kg to lb",
-  ...) → CalcCodex registers **one converter per dimension** (length,
+  ...) → CalcDex registers **one converter per dimension** (length,
   mass, area, volume, temperature, speed, time, data, pressure,
   energy, power, force, torque, density, frequency, flow,
   illuminance, fuel economy) with the unit pair as numbered inputs,
@@ -36,18 +36,18 @@ Omni inflates its count with one page per *pair* or per *item*:
   oil...) with the published grams-per-cup density.
 - Percentage family: Omni lists percentage, percentage increase,
   percentage decrease, percentage change, percentage difference as
-  separate pages → CalcCodex registers each distinct operation
+  separate pages → CalcDex registers each distinct operation
   (percent-of, percent-is, percent-change, percent-difference,
   reverse-percent, percent-off-result).
 - Solve-for variants: Omni has separate pages to solve speed,
-  distance or time → CalcCodex registers each as its own calculator
+  distance or time → CalcDex registers each as its own calculator
   (same for Ohm's law V/I/R, ideal gas P/V/n/T, dilution M2/V1).
 
 So the honest comparison is *operations covered*, not page titles.
 
 ## Per-category coverage (v0.1)
 
-| Omni/Nutilz category | CalcCodex category | Status |
+| Omni/Nutilz category | CalcDex category | Status |
 |---|---|---|
 | Math | Math | Broad: percentages, fractions, powers/roots/logs, number theory, algebra, geometry areas/volumes, trig |
 | Finance | Finance | Broad: interest, loans, mortgage, tax/VAT, margin/markup, salary, break-even, payoff, depreciation |
@@ -76,3 +76,14 @@ registry test, exact count 299 at v0.1.0).
 Per-category counts from `--list`: Math 61, Finance 34, Physics 31,
 Conversion 31, Construction 26, Health 24, Chemistry 23, Statistics 21,
 Everyday 15, Sports 7, Food 7, Ecology 7, Date & Time 7, Other 5.
+
+
+## v0.1.1 note (2026-10-25)
+
+v0.1.1 changes no calculator count (299) and no formulas. It renames
+the program (built under its previous name in v0.1.0),
+merges every date calculator's year/month/day boxes into single
+MM/DD/YYYY fields with named date groups (Birth Date, End Date, Start
+Date, From Date, Target Date, Date, First Day of Last Period), adds
+Today? buttons and CLI one-argument dates, and adds the shared
+GUI+CLI calculation log.
