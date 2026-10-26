@@ -63,23 +63,6 @@ Dark "Terminal" theme, exactly SEAN's Purgeon Terminal colours:
 near-black background `#0c0c0c`, panels `#121212`, phosphor-green
 accent `#4ade80`, Cascadia Mono type, sharp corners everywhere.
 
-## The feel
-
-SEAN's brief for the Design 3 window: it should feel
-*"interactive, intuitive, well-organized, accessible, easy,
-robust, not cumbersome — and very polished."* In practice:
-answers appear the moment you press Calculate and land in the
-history rail in the same instant; the path to a result is mode →
-calculator → values → CALCULATE (no more clicks than the old
-layout, and the keypad adds a mouse-only path); the mode rail
-never reshuffles and search narrows from the first letters; every
-colour pairing is measured at or above WCAG AA contrast, and the
-whole flow works from the keyboard (Alt+ mode keys, then Tab);
-nothing you can type crashes it — bad input gets a teaching
-error; and the spacing, the keypad grid, and the empty states
-were given a dedicated polish pass. How it feels on a real
-Windows machine stays Unverified until SEAN's run — his word is
-the verdict, as always.
 
 ## How to use it (window)
 
