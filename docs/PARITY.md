@@ -1,4 +1,4 @@
-# Parity — CalcDex v0.1.1
+# Parity — CalcDex v0.2.0
 
 Scored ONLY from test/build evidence in this repo (Elite rule).
 "Covered" means a registered calculator exists AND the category has
@@ -20,8 +20,9 @@ judgement, labelled as such, not a website page count.
 | Date & Time | Real calendar algorithm + dates_known_answers (leap-year rejection asserted) + v011 tests (MM/DD/YYYY parse/format round-trip, teaching errors, CLI date-arg equivalence, merged date-group metadata on all 9 date calculators) | Covered — v0.1.1 merged date fields, Today? button, Birth/End Date wording |
 | Sports/Food/Ecology/Other | Registry + sports_food_eco_known_answers | Covered — representative set (thinner than Math/Finance by design of v0.1) |
 | Error handling (safety) | errors_are_clear_and_never_panic test | Covered for tested paths |
-| GUI == CLI parity | Same `run_calc` dispatch in main.rs CLI and GUI calculate() | Covered by construction; GUI look FIELD-VERIFIED for v0.1.0 on SEAN's machine (2026-10-25 screenshots); the v0.1.1 date/log GUI additions are Unverified until his fresh captures |
-| Calculation log | lib history functions + tests/v011 log round-trip/cap/restore tests + CLI --log/--clear-log in main.rs | Covered (v0.1.1) — GUI log view code-verified, field look Unverified |
+| GUI == CLI parity | Same `run_calc` dispatch in main.rs CLI and GUI calculate() | Covered by construction; v0.1.1 GUI FIELD-VERIFIED on SEAN's machine (2026-10-25 screenshots). v0.2.0 Design 3 layout (mode rail, keypad, display, docked history rail) is code-verified only — its on-Windows look is Unverified until SEAN's fresh captures |
+| Calculation log | lib history functions + tests/v011 log round-trip/cap/restore tests + CLI --log/--clear-log in main.rs | Covered — FIELD-VERIFIED at v0.1.1; v0.2.0 docks the same log as the right history rail (collapses to the centre log view below 1100 pt), file format and location unchanged |
+| On-screen keypad (Design 3) | Pure pad logic in lib (`pad_apply`/`pad_key_allowed`) + tests/v020.rs (7 tests: editing, per-kind key matrix, registry untouched at 299) | Covered by construction + unit tests; on-Windows feel Unverified |
 | Live-data calculators | Not implemented (offline design) | Gap — ROADMAP |
 | Matrix / graphing / two-series stats | Not implemented | Gap — ROADMAP |
 | Jurisdiction tax tables | Not implemented (rate-as-input versions exist) | Gap — ROADMAP |

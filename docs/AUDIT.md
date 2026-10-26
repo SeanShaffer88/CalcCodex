@@ -201,3 +201,50 @@ readability fix.
   estimate (Riegel, Cooper VO2max, Navy body fat) are labelled
   ESTIMATE in the program and were checked against their named
   published formulas.
+
+## v0.2.0 addendum — Design 3 layout (2026-10-25)
+
+The v0.2.0 window replaces the layout the audit above was written
+against; calculator content, formulas and outputs are unchanged
+(registry identical, all 299 known-answer vectors still green).
+Layout-specific audit notes:
+
+**Contrast — new pairings measured with the same relative-luminance
+formula as the table above; every pairing passes WCAG AA (≥ 4.5:1):**
+
+| Pairing | Ratio | AA |
+|---|---|---|
+| Rail shortcut hints #9a9a9a on panel #121212 | **6.66 : 1** | Pass |
+| Hint text #9a9a9a on raised #181818 | **6.31 : 1** | Pass |
+| Keypad text #d0d0d0 on keypad fill #181818 | **11.51 : 1** | Pass |
+| Display green #4ade80 on display #0c0c0c | **11.23 : 1** | Pass |
+| Display placeholder #9a9a9a on #0c0c0c | **6.95 : 1** | Pass |
+| `=` key green #4ade80 on green-dim #1d3b27 | **7.06 : 1** | Pass |
+| Error red #f26d6d on display #0c0c0c | **6.69 : 1** | Pass |
+
+All v0.1.2 pairings (list text 12.15:1, selected 7.87:1) are
+unchanged and still in force for mode rows and calculator chips.
+
+**Layout mechanisms (Design 3):** the mode rail is a resizable
+SidePanel (140–240 pt); mode rows are fixed-height (30 pt) with
+marker-bar selection, so the rail never reflows between sessions.
+The history rail is a resizable right SidePanel (240–420 pt)
+shown only when the content width is at least 1100 pt AND the LOG
+toggle is on; below that the centre hosts the same history UI.
+Centre content keeps the v0.1.2 mechanisms (vertical scroll,
+38%-label/fluid-field rows) inside a 520 pt-capped keypad grid
+whose four columns are computed from the actual available width,
+so the grid is exact at minimum, default and large sizes and
+under 150–200% zoom.
+
+**Keyboard path (audited by construction):** Alt+ the printed key
+selects any of the 15 modes; Tab then reaches the search box, the
+calculator chips, every field, Today?, CALCULATE, the keypad, and
+history RE-OPEN/CLEAR LOG buttons. Mode rows themselves are mouse
+targets — their keyboard equivalent is the Alt+ key, which is
+what the row prints.
+
+**On-Windows status:** the layout's look and feel (including the
+collapse behaviour at real window sizes) is **Partially Verified**
+— construction + code review + the measured ratios above; SEAN's
+run is the remaining verdict, as with v0.1.2.
