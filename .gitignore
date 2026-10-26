@@ -1,0 +1,4 @@
+/target
+/dist/*.exe
+/dist/*.zip
+/staging-portable

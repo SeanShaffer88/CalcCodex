@@ -1,0 +1,134 @@
+# CalcCodex
+
+## TL;DR
+
+CalcCodex is one free program for Windows that does almost every kind of
+calculation in one place — like having a big box of hundreds of different
+calculators (for money, health, school maths, building jobs, cooking,
+sports, and much more) that all work with no internet, no ads, and no
+sign-up. Pick a calculator, type your numbers, read the answer with the
+working shown in plain words. It also works from the command line for
+people who like typing commands.
+
+Free forever. Optional donations are allowed but never required and
+never unlock anything. No ads, no in-app purchases, no selling data.
+
+## Who it is for
+
+CalcCodex is built for **students, teachers, professors, scientists
+and engineers** — people who need a result they can check, not just a
+number. That is why every calculator:
+
+- shows its **formula, the substituted values, and the result**
+  (worked steps you can follow or mark against),
+- keeps **full precision** in results (rounded forms are labelled,
+  never silently substituted),
+- accepts **scientific notation** inputs (e.g. `6.022e23`, `1.5e-3`),
+- names the **constants** it uses (g = 9.80665 m/s², R = 0.082057
+  L·atm/(mol·K) = 8.314 J/(mol·K), Avogadro 6.02214076×10²³),
+- uses correct **units and symbols**, and labels anything that is an
+  approximation as an **ESTIMATE** (body-fat, BAC, race prediction,
+  carbon footprint and similar),
+- explains input errors in words that say *why* there is no answer
+  (for example: log of a negative number has no real value).
+
+**For students & teachers:** results read like worked solutions —
+formula first, then the numbers put in, then the answer — so homework
+and lab calculations can be verified line by line.
+
+**For professionals:** the same registry runs from the command line,
+so any calculation in the window can be scripted, repeated and logged
+with identical output.
+
+## What it does
+
+CalcCodex brings together the calculator sets of two big websites —
+Omni Calculator (3,938 calculators) and Nutilz (637+ tools, calculator
+subset only) — as one offline desktop program. Where those sites list
+hundreds of near-identical pages (for example a separate page for every
+unit pair), CalcCodex uses one calculator where you pick the units —
+see `docs/COVERAGE.md` for the honest mapping.
+
+Categories: Math, Finance, Health, Physics, Chemistry, Construction,
+Conversion, Statistics, Date & Time, Everyday, Sports, Food, Ecology,
+Other.
+
+Every calculator shows its formula and the steps in plain words, and
+handles bad input (dividing by zero, square root of a negative, and so
+on) with a clear message instead of crashing.
+
+## The look
+
+Dark "Terminal" theme, exactly SEAN's Purgeon Terminal colours:
+near-black background `#0c0c0c`, panels `#121212`, phosphor-green
+accent `#4ade80`, Cascadia Mono type, sharp corners everywhere.
+
+## How to use it (window)
+
+1. Run `CalcCodex.exe`.
+2. Type in the Search box (or pick a Category) on the left.
+3. Click a calculator.
+4. Fill in the labelled number boxes (list calculators take numbers
+   separated by commas or spaces in one big box).
+5. Press CALCULATE and read the result, with the formula and steps.
+
+## How to use it (command line)
+
+Every calculator works the same from the command line — nothing is
+window-only:
+
+```
+CalcCodex --list
+CalcCodex --search loan
+CalcCodex compound-interest 1000 5 10
+CalcCodex bmi 70 175
+CalcCodex mean 1 2 3 4
+CalcCodex convert-length 1 7 3
+```
+
+Numbers go in the same order as the labelled boxes in the window.
+For unit converters the two extra numbers pick the units from the
+numbered list shown in that calculator's description.
+`CalcCodex --help` explains the rest.
+
+## Requirements & building
+
+- Windows 10/11 for the shipped program (it is a standard Windows
+  .exe; it also builds and runs on Linux for development).
+- To build from source: a recent Rust toolchain, then:
+  `cargo build --release` — and the full check is
+  `cargo fmt + cargo clippy --all-targets + cargo test --locked`.
+
+## Install
+
+Releases carry exactly two files, as always:
+
+1. `CalcCodex-Setup-0.1.0.exe` — the installer (per-user, no admin).
+2. `CalcCodex-0.1.0-portable.zip` — the portable build: just the .exe
+   plus the license and a short note. Unzip and run.
+
+The program is unsigned (no code-signing certificate) — Windows may
+warn on first run; choose "More info", then "Run anyway", if you trust
+this build. Check the SHA-256 in the release notes to be sure.
+
+## Screenshots
+
+To be confirmed — real captures from SEAN's machine will be added
+after his first run. (No placeholder pictures, ever.)
+
+## Limitations (honest)
+
+- Formula calculators only: the very specialised Omni pages that need
+  live data (currency exchange rates, weather, stock prices), big
+  lookup tables (tax brackets by country/year), medical diagnosis, or
+  drawing graphs are not in v0.1 — they are listed in
+  `docs/ROADMAP.md`, not silently dropped.
+- Health and building results are estimates from the standard
+  published formulas named in each calculator. They are not medical
+  or engineering advice.
+- See `docs/PARITY.md` for category-by-category scoring from test
+  evidence.
+
+## License
+
+MIT — see `LICENSE`. Free software; use it, share it, change it.
