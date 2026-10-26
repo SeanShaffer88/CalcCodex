@@ -1,12 +1,17 @@
-CalcCodex — portable build
+CalcDex — portable build
 
-Just run CalcCodex.exe. Nothing is installed, nothing is written to your
-PC by the program, and no internet is used. Delete the folder to remove it.
+Just run CalcDex.exe. Nothing is installed and no internet is used.
+Delete the folder to remove it. The one thing the program writes is its
+calculation log: every successful calculation is saved automatically to
+%APPDATA%\CalcDex\history.txt (view it with the LOG button, or with
+CalcDex.exe --log; empty it with CalcDex.exe --clear-log).
 
 Every calculator also works from the command line, for example:
-  CalcCodex.exe --list
-  CalcCodex.exe compound-interest 1000 5 10
-  CalcCodex.exe bmi 70 175
+  CalcDex.exe --list
+  CalcDex.exe compound-interest 1000 5 10
+  CalcDex.exe bmi 70 175
+  CalcDex.exe age 04/23/1988 10/25/2026
+  CalcDex.exe --log
 
 The program is free (MIT license, see LICENSE). The binary is unsigned —
 Windows may warn on first run; choose More info, then Run anyway, if you
