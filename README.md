@@ -127,10 +127,245 @@ CalcDex --favourite bmi
 CalcDex --favourites
 ```
 
+More command-line tools (v0.4.0 — display formats, copy formats,
+expressions, typed quantities, spec check, help, log undo,
+update check):
+
+```
+CalcDex --format engineering compound-interest 1000 5 10
+CalcDex --format auto compound-interest 1000 5 10
+CalcDex bmi 70 175 --as csv
+CalcDex bmi 70 175 --spec 18.5 25
+CalcDex expr "2*(3+4)^2"
+CalcDex bmi "154 lb" "5 ft 9 in"
+CalcDex --help-guide
+CalcDex --restore-log
+CalcDex --check-update
+```
+
 Numbers go in the same order as the labelled boxes in the window.
 For unit converters the two extra numbers pick the units from the
 numbered list shown in that calculator's description.
 `CalcDex --help` explains the rest.
+
+## New in v0.8.0 — the engineers batch
+
+Electronics and mechanical tools, a materials table, and a
+polished calculation log — in the window and on the command
+line alike. Registry now **316 calculators**. This batch
+completes the 50-enhancement program (items 41–45 and 49).
+
+- **Electronics pack (#41, in Physics).** Resistor Colour Code:
+  type the band colours (`red red brown gold`) to read a
+  resistor, or type a value (`4700`, `4.7k`) to get its bands.
+  Resistors in Series & Parallel gives both totals for one list.
+  Voltage Divider gives Vout, the current, and each resistor's
+  power.
+- **Tolerance Stack-Up (#42, in Construction).** Dimensions as
+  (nominal, tolerance) pairs → the total with its worst-case
+  range and its RSS (root-sum-square) range.
+- **Safety Factor & Margin of Safety (#43).** Strength against
+  an applied stress (or a load over an area): FoS, MoS, and a
+  plain-language reading — below 1 is called a predicted
+  failure.
+- **Materials table (#44).** Twelve common materials with
+  typical density, resistivity and Young's modulus values,
+  labelled as typical values (resistivity is marked
+  not-applicable for insulators). `CalcDex --materials` prints
+  the table; the header's MATERIALS view is the same table with
+  a USE E IN BEAM button per row.
+- **Mechanical pack (#45, in Construction).** Bolt Torque
+  (T = K × D × F, N·m and ft·lbf) and Beam — Stress &
+  Deflection (simply supported, central load, rectangle or
+  circle section; E typed in or taken from a materials-table
+  code).
+- **Log polish (#49).** Search the log, filter it by
+  calculator, tag or date, pin entries so the 500-entry trim
+  never drops them, and export the filtered set to a text file:
+  `CalcDex --log-search`, `--log-filter`, `--log-pin`,
+  `--log-export` — and the same controls in the window's log
+  view.
+
+## New in v0.7.0 — the scientists batch
+
+Tools for lab and research work, in the window and on the command
+line alike. Registry now **309 calculators**.
+
+- **Paste a column (#32).** List calculators (Mean, Standard
+  Deviation, Linear Regression and the rest) accept numbers
+  separated by commas, spaces, tabs, semicolons or new lines — a
+  copied spreadsheet column pastes straight in, in the window
+  field and as command-line arguments. A token that is not a
+  number is named in the error.
+- **Replicates Summary (#33).** One step from a set of repeated
+  measurements to the mean, sample standard deviation, standard
+  error of the mean, and the 95% confidence interval (Student's
+  t for small samples, the normal value beyond 30 degrees of
+  freedom).
+- **Outlier Check (#36).** Quartiles (Q1, median, Q3), the
+  interquartile range, and the 1.5×IQR fences, with any outlying
+  values listed — or a plain statement that there are none.
+- **Serial Dilution (#35).** A dilution series planned step by
+  step: starting concentration, then either transfer + diluent
+  volumes or a plain factor per step, giving the concentration
+  after every step.
+- **Constants library (#38).** Fifteen CODATA 2018 constants
+  (c, h, ħ, e, k_B, N_A, R, G, ε0, μ0, m_e, m_p, u, F, σ) usable
+  by name in the Expression Calculator — `h*c/500e-9` is the
+  energy of a 500 nm photon. The CONSTANTS view lists them with
+  an INSERT button; `CalcDex --constants` prints them. Your own
+  constants (`CalcDex --define name=value`) are stored in the
+  shared settings file and can never replace a built-in.
+- **Uncertainty propagation (#40).** In the Expression
+  Calculator, `10 ± 0.2` (or `10 +/- 0.2`) carries its
+  uncertainty through + − × ÷ ^ and functions by the first-order
+  lab rules, and the result prints as value ± uncertainty with
+  the percentage — each step names the rule used.
+- **Lab notebook (#39).** Any log entry can carry a tag and a
+  note (LOG view, or `--log-tag` / `--log-note`); edits back the
+  log up first. `--lab-export <file>` writes the log as a plain
+  text lab record, oldest first, with the timestamps stated as
+  UTC. History files from earlier versions read unchanged.
+
+## New in v0.6.0 — the teachers batch
+
+Tools for the front of the classroom, in the window and on the
+command line alike:
+
+- **Projection mode** — a header toggle rendering the window at
+  about 1.5x with higher contrast, saved between runs
+  (`CalcDex --projection on|off`).
+- **Problem sets** — build a set of problems (calculator +
+  values) in the SETS view or with `CalcDex set new|add|open`;
+  the plain-text set file holds problems only, so it doubles as
+  the student assignment. Sets can be generated from a seed
+  (`set generate --seed N --count K`) — the same seed always
+  makes the identical set.
+- **Worksheets and answer keys** — export a printable
+  plain-text worksheet (name/date header, working space, no
+  answers) and a separate teacher answer key with answers and
+  one-line working.
+- **Bulk marking** — `CalcDex --mark <set> <answers.csv>` marks
+  a whole class CSV (fractions checked exactly) and prints a
+  score line per student.
+- **Course packs** — the rail filters the calculators to GCSE
+  (115), A-Level (161), AP (121) or Undergrad (210) by real
+  curriculum fit (`CalcDex --pack GCSE --list`).
+- **Demonstration mode** — DEMO hides a run's result values
+  until REVEAL is pressed; the log keeps the real results.
+- **Formula sheets and class examples** — printable per-category
+  formula sheets (`--formula-sheet Math out.txt`) and a saved
+  examples library (`--save-example`, `--examples`,
+  `--open-example`).
+
+## New in v0.5.0 — the students batch
+
+Tools for learning and teaching, in the window and on the command
+line alike:
+
+- **Formula & symbols (#19).** Every calculator shows its formula
+  and what each symbol means, in a FORMULA & SYMBOLS section
+  under its form. `CalcDex --describe <id>` prints them too.
+- **Deeper steps (#12).** The STEPS header selector's Deeper mode
+  shows the formula, the formula with your values in it, the
+  working, and the result, as four labelled stages.
+  Command line: `--steps deeper`.
+- **Check my answer (#13).** Type your own answer and be checked:
+  exactly for the fraction calculators, within 0.5% for the rest.
+  A wrong answer that matches a common slip (100x, 4x, squared,
+  sign flipped, ...) names the likely slip. Command line:
+  `CalcDex <id> <args> --check <answer>`.
+- **Exact mode (#14).** A display format alongside Off / Sig
+  figs / Decimals / Engineering / Auto: fraction results are
+  labelled exact, pi geometry also shows its exact form (25*pi),
+  and the Expression Calculator works rational expressions out
+  exactly (1/3 + 1/6 = 1/2). Anything outside that scope keeps
+  the decimal answer and says so. Command line: `--format exact`.
+- **Practice mode (#15).** The PRACTICE header toggle opens a
+  view that generates problems (answer hidden) for the picked
+  calculator or a random one, checks your answer, and can reveal
+  the worked solution. A seed field makes problem sequences
+  reproducible. Date, list, unit-code and lookup-table
+  calculators are excluded — the view says so. Command line:
+  `CalcDex <id> --practice --seed N [--answer X]`.
+- **Graph plot (#17).** The Expression Calculator plots its
+  expression in x (range fields included); the quadratic solver
+  plots its parabola. Command line: `CalcDex expr "x^2" --plot
+  -5 5` prints the plot as CSV sample points.
+- **Export worked solution (#18).** EXPORT SOLUTION under the
+  steps saves the name, formula, inputs, steps and result as a
+  plain-text file. Command line: `CalcDex <id> <args> --export
+  <path>`.
+
+## New in v0.4.0 — the rigour batch
+
+Program items 2, 3, 4, 5, 6, 7, 8, 9, 10 and 37, plus four
+standing-rule features. Registry now **306 calculators**.
+Everything is in the window AND on the command line:
+
+- **One display-format setting.** The header FORMAT selector
+  (Off / Sig figs / Decimals / Engineering / Auto) replaces the
+  v0.3.0 SIG FIGS selector. Decimals shows a fixed number of
+  decimal places; Engineering shows the headline with SI
+  prefixes (1.63 k, 4.2 M, 350 m, down to pico); Auto works out
+  the significant figures from the numbers you typed and says
+  why ("Inputs carry 3 significant figures"). Only one
+  annotation line is ever added, a VIEW row under the display
+  re-renders the current result in another format without
+  changing the setting, and a Rounding choice (Half up /
+  Banker's / Truncate) controls how halves round inside every
+  format. All of it is display only — full precision is always
+  kept and logged. CLI: `--format <mode[:n]>`, `--decimals N`,
+  `--rounding half-up|bankers|truncate`.
+- **Copy the result four ways.** Buttons under the display
+  copy the result as plain text, LaTeX (the printed values and
+  lines with the text escaped and numbers in $...$ — an export
+  of what CalcDex printed, not a re-derived formula), scientific
+  notation, or CSV (label,value rows). CLI: `--as
+  latex|csv|sci|plain`.
+- **Expression Calculator.** A new Math calculator that takes a
+  whole expression — `2*(3+4)^2`, `sin(30)`, `sqrt(16)+abs(-3)`
+  — with + − * / ^, parentheses, the functions sin cos tan asin
+  acos atan sqrt ln log10 exp abs, constants pi/e/tau and a
+  degrees/radians switch. Mistakes get teaching errors (where
+  in the expression, and what was expected). Every run is saved
+  in the calculation log, which is its paper tape. CLI:
+  `CalcDex expr "2*(3+4)^2"`.
+- **Typed quantities.** Fields that carry a unit family accept
+  amounts typed the way people write them: `5 ft 3 in`,
+  `1.2 kg`, `70 F`, `2 h 30 min`, `3 lb 4 oz`. Compound amounts
+  add up and are converted into the unit the field expects
+  (converters: into the FROM unit you picked). Coverage: all
+  converter calculators, the physics set (speed, force,
+  energy, power, pressure, Ohm's law, projectile, pendulum,
+  wave, torque, momentum and more) and the BMI/BMR/water/
+  protein health calculators. Other fields keep plain-number
+  entry. If a typed amount's dimension does not match the
+  field — a length typed into a mass field — the run stops
+  with a plain warning naming both. Plain numbers never warn.
+- **Five compound-unit converters.** Density, Fuel Consumption
+  (L/100km ↔ mpg US/UK ↔ km/L), Data Rate (Mbps ↔ MB/s and
+  more), Concentration (mg/mL ↔ g/L ↔ % w/v) and Energy
+  Density — in the Conversion category, with examples, hints
+  and known-answer checks like the other converters.
+- **Spec check.** Enter Min/Max under the display and each
+  numeric result line is judged PASS (inside the limits —
+  the limits themselves count as inside) or FAIL, saying
+  which limit and by how much, with a ✓/✗ symbol and a word
+  as well as colour. CLI: `--spec MIN MAX`.
+- **Built-in help.** The header HELP button (or F1) opens a
+  plain-words guide inside the program — what CalcDex is,
+  the five things people do most, the keyboard shortcuts,
+  where the files live, and the command line in 3 lines.
+  `CalcDex --help-guide` prints the same text.
+- **Undo for clearing the log.** CLEAR LOG saves the log to
+  `history-backup.txt` first; RESTORE CLEARED LOG in the
+  history view (or `--restore-log`) puts it back. Batch runs
+  refuse to overwrite an existing output file unless you
+  allow it (OVERWRITE toggle in the window, `--force` on the
+  CLI) — and then the old file is kept as a `.bak` copy.
+- **Drag and drop.** Drop a .csv file on the window and the
+  BATCH panel opens with the input path filled in.
 
 ## New in v0.3.0 — Batch 1 of the 50-enhancement program
 
@@ -201,7 +436,7 @@ has a plain-words tooltip saying what it does — no exceptions
 construction in the code and checked by a test).
 
 **Settings file:** favourites, recent, remembered inputs and the
-sig-figs choice live in `%APPDATA%\CalcDex\settings.txt` (plain
+display-format choice live in `%APPDATA%\CalcDex\settings.txt` (plain
 text, format documented in the file's code). The window and the
 command line read and write the SAME file — it is the shared
 source of truth, so a calculator you star or run on the command
@@ -218,13 +453,26 @@ calculations) can be found again later:
   right of the window, newest first (header **LOG** shows/hides
   it; on narrow windows the same history opens in the centre).
   **RE-OPEN** on an entry loads that calculator with its inputs
-  restored; **CLEAR LOG** empties the log.
-- Or from the command line: `CalcDex --log` prints the log and
-  `CalcDex --clear-log` empties it.
+  restored; **CLEAR LOG** empties the log — but first saves it
+  to `history-backup.txt`, and **RESTORE CLEARED LOG** (shown
+  when a backup exists) undoes the clear.
+- Or from the command line: `CalcDex --log` prints the log,
+  `CalcDex --clear-log` empties it (with the same backup) and
+  `CalcDex --restore-log` undoes the clear.
 - Entries are kept in `%APPDATA%\CalcDex\history.txt` (plain text:
   time, calculator, inputs — dates in MM/DD/YYYY form — and result).
   Only the newest 500 entries are kept; log timestamps are UTC.
   Failed calculations are never logged.
+
+## Privacy & network
+
+CalcDex works fully offline and collects nothing. It makes **no
+network connection at all** unless you press **Check for
+updates** in the HELP panel (or run `CalcDex --check-update`),
+or switch on "Check for updates at startup" in the HELP panel
+(default OFF). The check only reads the newest release version
+from github.com and shows you the release page if it is newer —
+it never downloads or installs anything by itself.
 
 ## Requirements & building
 
@@ -236,11 +484,16 @@ calculations) can be found again later:
 
 ## Install
 
-Releases carry exactly two files, as always:
+Release downloads come per architecture — 64-bit (x64), 32-bit
+(x86) and ARM64 — each as an installer plus a portable zip, with
+an MSI for x86/x64 as well:
 
-1. `CalcDex-Setup-0.3.0.exe` — the installer (per-user, no admin).
-2. `CalcDex-0.3.0-portable.zip` — the portable build: just the .exe
-   plus the license and a short note. Unzip and run.
+- `CalcDex-Setup-x64.exe`, `CalcDex-Setup-x86.exe`,
+  `CalcDex-Setup-ARM64.exe` — the installers (per-user, no admin).
+- `CalcDex-Setup-x86_64.msi` — the MSI installer (x64).
+- `CalcDex-Portable-x64.zip`, `CalcDex-Portable-x86.zip`,
+  `CalcDex-Portable-ARM64.zip` — the portable builds: just the
+  .exe plus the license and a short note. Unzip and run.
 
 The program is unsigned (no code-signing certificate) — Windows may
 warn on first run; choose "More info", then "Run anyway", if you trust
@@ -268,10 +521,10 @@ automatically; RE-OPEN restores an entry's calculator and inputs,
 CLEAR LOG empties the log. Timestamps are UTC.*
 
 **Captures still needed (real ones only, no placeholders):** a fresh
-main-window shot of **v0.3.0** showing the Design 3 layout with the
-Batch 1 features (mode rail, display, history rail, hints
-under the fields), ideally one at full width and one narrow enough
-that the history rail has collapsed.
+main-window shot of **v0.4.0** showing the Design 3 layout with the
+rigour features (mode rail, display with its format/copy/spec rows,
+history rail, hints under the fields), ideally one at full width
+and one narrow enough that the history rail has collapsed.
 
 ## Limitations (honest)
 
