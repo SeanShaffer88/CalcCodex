@@ -4,10 +4,25 @@
 //! three, at %APPDATA%\CalcDex\settings.txt.
 //!
 //! Format (one record per line, `#` comments allowed):
-//!   sig_figs=3            (or sig_figs=off)
+//!   display_format=sig-figs:3   (off | sig-figs:N | decimals:N |
+//!                                engineering | auto; v0.4.0 — the
+//!                                old sig_figs= line still loads)
+//!   rounding=half-up      (half-up | bankers | truncate)
+//!   update_check_startup=off    (offer-only update check; off
+//!                                unless the user switches it on)
+//!   steps=standard        (standard | deeper; v0.5.0 #12)
+//!   projection=off        (on | off; v0.6.0 #21 classroom
+//!                          projection mode: larger text + higher
+//!                          contrast in the window)
 //!   favourite=<calc id>
 //!   recent=<id>,<id>,...  (most recent first, max 8)
 //!   inputs.<calc id>=<token>;;<token>;;...
+//!   constant.<name>=<value>   (v0.7.0 #38: a user-defined
+//!                                constant for the Expression
+//!                                Calculator; names are validated
+//!                                by rigour::validate_constant_name,
+//!                                so a line naming a built-in
+//!                                constant or function never loads)
 //! Input tokens are the display tokens of a run (dates as
 //! MM/DD/YYYY), separated by ";;" exactly like the calculation log's
 //! restore field; backslash escapes `\\`, `\;` and `\n` inside a
@@ -15,19 +30,36 @@
 //! corrupt or missing file NEVER breaks startup; the app falls back
 //! to defaults (see `load_settings`).
 
+use crate::rigour::{DisplayFormat, DisplayMode, RoundingMode};
 use std::collections::{BTreeSet, HashMap};
 
 pub const RECENT_CAP: usize = 8;
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Settings {
-    /// Significant-figures display choice (None = off).
-    pub sig_figs: Option<u8>,
+    /// Unified display format (v0.4.0 #1/#2/#3/#37): mode,
+    /// figure count, and the rounding mode (#9).
+    pub display: DisplayFormat,
+    /// Offer-only update check at startup (default OFF — the
+    /// program makes no network connection unless this is on or
+    /// the user presses Check for updates).
+    pub update_check_startup: bool,
+    /// Deeper steps mode (v0.5.0, program #12): the steps area
+    /// shows the four labelled stages instead of the raw output.
+    pub steps_deeper: bool,
+    /// Classroom projection mode (v0.6.0, program #21): the
+    /// window renders at ~1.5x zoom with brightened muted/hint
+    /// colours so the back of a classroom can read it.
+    pub projection: bool,
     pub favourites: BTreeSet<String>,
     /// Most recent first.
     pub recent: Vec<String>,
     /// calc id -> display tokens of its last run (item #48).
     pub remembered: HashMap<String, Vec<String>>,
+    /// User-defined constants (v0.7.0 #38): (name, value) pairs
+    /// in definition order; names are stored already validated +
+    /// lowercased by rigour::validate_constant_name.
+    pub constants: Vec<(String, f64)>,
 }
 
 fn esc(s: &str) -> String {
@@ -82,9 +114,24 @@ fn split_tokens(s: &str) -> Vec<String> {
 pub fn serialize_settings(s: &Settings) -> String {
     let mut out = String::new();
     out.push_str("# CalcDex settings — see settings.rs for the format.\n");
-    match s.sig_figs {
-        Some(n) => out.push_str(&format!("sig_figs={n}\n")),
-        None => out.push_str("sig_figs=off\n"),
+    out.push_str(&format!("display_format={}\n", s.display.as_setting()));
+    out.push_str(&format!("rounding={}\n", s.display.rounding.as_setting()));
+    out.push_str(&format!(
+        "update_check_startup={}\n",
+        if s.update_check_startup { "on" } else { "off" }
+    ));
+    out.push_str(if s.steps_deeper {
+        "steps=deeper\n"
+    } else {
+        "steps=standard\n"
+    });
+    out.push_str(if s.projection {
+        "projection=on\n"
+    } else {
+        "projection=off\n"
+    });
+    for (name, value) in &s.constants {
+        out.push_str(&format!("constant.{name}={value}\n"));
     }
     for f in &s.favourites {
         out.push_str(&format!("favourite={f}\n"));
@@ -111,12 +158,31 @@ pub fn parse_settings(text: &str, valid_ids: &BTreeSet<String>) -> Settings {
         if line.is_empty() || line.starts_with('#') {
             continue;
         }
-        if let Some(v) = line.strip_prefix("sig_figs=") {
-            s.sig_figs = if v == "off" {
-                None
-            } else {
-                v.parse::<u8>().ok().filter(|n| (1..=10).contains(n))
-            };
+        if let Some(v) = line.strip_prefix("display_format=") {
+            if let Ok(f) = DisplayFormat::parse(v) {
+                // Keep an already-read rounding choice.
+                let rounding = s.display.rounding;
+                s.display = DisplayFormat { rounding, ..f };
+            }
+        } else if let Some(v) = line.strip_prefix("rounding=") {
+            if let Some(r) = RoundingMode::parse(v) {
+                s.display.rounding = r;
+            }
+        } else if let Some(v) = line.strip_prefix("update_check_startup=") {
+            s.update_check_startup = v == "on" || v == "true";
+        } else if let Some(v) = line.strip_prefix("steps=") {
+            s.steps_deeper = v.trim() == "deeper";
+        } else if let Some(v) = line.strip_prefix("projection=") {
+            s.projection = v.trim() == "on" || v.trim() == "true";
+        } else if let Some(v) = line.strip_prefix("sig_figs=") {
+            // Legacy (v0.3.0) line: only applies when no explicit
+            // display_format line has set a mode.
+            if s.display.mode == DisplayMode::Off && v != "off" {
+                if let Some(n) = v.parse::<u8>().ok().filter(|n| (1..=10).contains(n)) {
+                    s.display.mode = DisplayMode::SigFigs;
+                    s.display.n = Some(n);
+                }
+            }
         } else if let Some(v) = line.strip_prefix("favourite=") {
             if valid_ids.contains(v) {
                 s.favourites.insert(v.to_string());
@@ -128,6 +194,22 @@ pub fn parse_settings(text: &str, valid_ids: &BTreeSet<String>) -> Settings {
                 .filter(|x| valid_ids.contains(x))
                 .take(RECENT_CAP)
                 .collect();
+        } else if let Some(rest) = line.strip_prefix("constant.") {
+            // User-defined constants (#38): a line loads only if
+            // the name still validates (no built-in collision, no
+            // function name) and the value is a finite number —
+            // anything else is skipped like any other corrupt line.
+            if let Some((name, value)) = rest.split_once('=') {
+                if let (Ok(name), Ok(v)) = (
+                    crate::rigour::validate_constant_name(name),
+                    value.trim().parse::<f64>(),
+                ) {
+                    if v.is_finite() {
+                        s.constants.retain(|(n, _)| n != &name);
+                        s.constants.push((name, v));
+                    }
+                }
+            }
         } else if let Some(rest) = line.strip_prefix("inputs.") {
             if let Some((id, toks)) = rest.split_once('=') {
                 if valid_ids.contains(id) && !toks.is_empty() {

@@ -18,11 +18,18 @@
 #![allow(clippy::possible_missing_else)]
 
 pub mod calcs;
+pub mod engineers;
 pub mod features;
 pub mod meta;
+pub mod rigour;
 pub mod settings;
+pub mod students;
+pub mod teachers;
 
 pub type CalcFn = Box<dyn Fn(&[f64]) -> Result<String, String> + Sync + Send>;
+/// A text-input calculator (v0.4.0 expression calculator): the second
+/// argument is the angle mode, true = degrees, false = radians.
+pub type CalcTextFn = Box<dyn Fn(&str, bool) -> Result<String, String> + Sync + Send>;
 
 pub struct Calc {
     pub id: &'static str,
@@ -49,6 +56,18 @@ pub struct Calc {
     /// Pair calculators whose list may end with ONE extra single
     /// value (linear regression's calibration measurement).
     pub tail: bool,
+    /// Unit family per input (v0.4.0 #6/#7), "" = none known.
+    pub unit_families: &'static [&'static str],
+    /// Expected unit code per input for typed quantities ("kg", "cm"...).
+    pub quantity_units: &'static [&'static str],
+    /// Expected dimension name per input for the dimensional check.
+    pub dimensions: &'static [&'static str],
+    /// Unit names for parametric converters (value-field typed input).
+    pub converter_units: &'static [&'static str],
+    /// Text-input calculator support (#5): the run function takes the
+    /// raw text instead of numbers.
+    pub text_run: Option<CalcTextFn>,
+    pub example_text: &'static str,
     pub run: CalcFn,
 }
 
@@ -90,6 +109,12 @@ impl Calc {
             example: &[],
             hints: &[],
             tail: false,
+            unit_families: &[],
+            quantity_units: &[],
+            dimensions: &[],
+            converter_units: &[],
+            text_run: None,
+            example_text: "",
             run: Box::new(run),
         }
     }
@@ -121,6 +146,32 @@ impl Calc {
         self.hints = hints;
         self
     }
+    /// Attach typed-quantity metadata (#6/#7): one family, expected
+    /// unit and dimension per input ("" where none is known).
+    pub fn with_unit_info(
+        mut self,
+        families: &'static [&'static str],
+        units: &'static [&'static str],
+        dimensions: &'static [&'static str],
+    ) -> Calc {
+        self.unit_families = families;
+        self.quantity_units = units;
+        self.dimensions = dimensions;
+        self
+    }
+    pub fn with_converter_units(mut self, units: &'static [&'static str]) -> Calc {
+        self.converter_units = units;
+        self
+    }
+    /// Make this a text-input calculator (#5).
+    pub fn text_mode<F>(mut self, example_text: &'static str, run: F) -> Calc
+    where
+        F: Fn(&str, bool) -> Result<String, String> + Sync + Send + 'static,
+    {
+        self.example_text = example_text;
+        self.text_run = Some(Box::new(run));
+        self
+    }
 }
 
 /// Build the full registry (all category modules register here).
@@ -136,6 +187,7 @@ pub fn all_calcs() -> Vec<Calc> {
     calcs::stats::register(&mut v);
     calcs::everyday::register(&mut v);
     calcs::sports_food_eco::register(&mut v);
+    calcs::engineering::register(&mut v);
     // v0.3.0: attach the central metadata tables (examples + hints)
     // to the registry entries, so they are part of each Calc spec.
     for c in &mut v {
@@ -147,6 +199,13 @@ pub fn all_calcs() -> Vec<Calc> {
         for (id, hints) in meta::HINTS {
             if *id == c.id {
                 c.hints = hints;
+            }
+        }
+        for (id, families, units, dims) in meta::UNIT_INFO {
+            if *id == c.id {
+                c.unit_families = families;
+                c.quantity_units = units;
+                c.dimensions = dims;
             }
         }
     }
@@ -161,6 +220,12 @@ pub fn find_calc(id: &str) -> Option<Calc> {
 pub fn run_calc(id: &str, args: &[f64]) -> Result<String, String> {
     match find_calc(id) {
         Some(c) => {
+            if c.text_run.is_some() {
+                return Err(
+                    "This calculator takes text (an expression), not numbers — type the expression in its field, or use: CalcDex expr \"<expression>\"."
+                        .into(),
+                );
+            }
             if !c.list && args.len() != c.inputs.len() {
                 return Err(format!(
                     "'{}' needs {} number(s) ({}), got {}.",
@@ -181,6 +246,53 @@ pub fn run_calc(id: &str, args: &[f64]) -> Result<String, String> {
             }
             (c.run)(args)
         }
+        None => Err(format!("No calculator called '{id}'. Try: CalcDex --list")),
+    }
+}
+
+/// Parse a pasted or typed list of numbers (v0.7.0, item #32):
+/// the ONE parser behind every list field — the window's list box
+/// and the command line both call it, so the same text parses
+/// identically on both. Values may be separated by commas,
+/// semicolons, tabs, spaces or new lines (a pasted spreadsheet
+/// column is one value per line), in any mixture; empty stretches
+/// between separators are skipped. A token that is not a number
+/// is named in the error, with the accepted shapes restated.
+pub fn parse_value_list(text: &str) -> Result<Vec<f64>, String> {
+    let mut out = Vec::new();
+    for tok in text.split(|ch: char| {
+        ch == ',' || ch == ';' || ch == '\t' || ch == '\n' || ch == '\r' || ch == ' '
+    }) {
+        let tok = tok.trim();
+        if tok.is_empty() {
+            continue;
+        }
+        match tok.parse::<f64>() {
+            Ok(v) => out.push(v),
+            Err(_) => {
+                return Err(format!(
+                    "'{tok}' is not a number — a value list is numbers separated by commas, spaces, tabs, semicolons or new lines (a pasted column works as-is)."
+                ))
+            }
+        }
+    }
+    if out.is_empty() {
+        return Err(
+            "No numbers found — type or paste at least one number (values may be separated by commas, spaces, tabs, semicolons or new lines)."
+                .into(),
+        );
+    }
+    Ok(out)
+}
+
+/// Run a text-input calculator by id (#5). `degrees` selects the
+/// angle mode for trigonometric functions.
+pub fn run_text_calc(id: &str, text: &str, degrees: bool) -> Result<String, String> {
+    match find_calc(id) {
+        Some(c) => match &c.text_run {
+            Some(f) => f(text, degrees),
+            None => Err(format!("'{}' is not a text calculator.", c.name)),
+        },
         None => Err(format!("No calculator called '{id}'. Try: CalcDex --list")),
     }
 }
@@ -245,6 +357,26 @@ pub fn n(x: f64) -> String {
 /// Scientific notation, 6 decimal places (e.g. 6.022141e23).
 pub fn sci(x: f64) -> String {
     format!("{x:.6e}")
+}
+
+/// `n` with a scientific-notation fallback for the magnitudes
+/// where 10 decimal places would print a nonzero value as 0
+/// (or lose it entirely): |x| < 1e-6 or >= 1e15 switches to a
+/// trimmed scientific form (3.972891714e-19). Used where a result
+/// can genuinely be that small or large — the Expression
+/// Calculator above all (photon energies, particle masses).
+pub fn n_full(x: f64) -> String {
+    if x == 0.0 || !x.is_finite() {
+        return n(x);
+    }
+    let ax = x.abs();
+    if ax < 1e-6 || ax >= 1e15 {
+        let s = format!("{x:.12e}");
+        let (mant, exp) = s.split_once('e').unwrap_or((&s, ""));
+        let mant = mant.trim_end_matches('0').trim_end_matches('.');
+        return format!("{mant}e{exp}");
+    }
+    n(x)
 }
 
 /// n with a fixed number of decimals, trimmed.
@@ -429,6 +561,20 @@ pub fn display_tokens(c: &Calc, args: &[f64]) -> Vec<String> {
 /// `CalcDex age 1988 4 23 2026 10 25` are equivalent. Non-date tokens
 /// may also be comma-separated groups (previous behaviour).
 pub fn expand_args(c: &Calc, toks: &[String]) -> Result<Vec<f64>, String> {
+    // List calculators (v0.7.0 #32): every argument goes through
+    // the shared value-list parser, so a pasted column (one value
+    // per line, in quotes) parses exactly like separate arguments,
+    // and the window's list box accepts the identical text.
+    if c.list {
+        let mut nums = Vec::new();
+        for t in toks {
+            nums.extend(parse_value_list(t)?);
+        }
+        if nums.is_empty() {
+            return Err("Enter at least one number.".into());
+        }
+        return Ok(nums);
+    }
     // Flatten: a token containing '/' is kept whole (it is a date);
     // other tokens are split on commas like before.
     let mut flat: Vec<String> = Vec::new();
@@ -443,13 +589,13 @@ pub fn expand_args(c: &Calc, toks: &[String]) -> Result<Vec<f64>, String> {
             }
         }
     }
-    if c.list || c.date_groups.is_empty() {
+    if c.date_groups.is_empty() {
         let mut nums = Vec::new();
-        for t in &flat {
-            match t.trim().parse::<f64>() {
-                Ok(v) => nums.push(v),
-                Err(_) => return Err(format!("'{t}' is not a number.")),
-            }
+        for (idx, t) in flat.iter().enumerate() {
+            // v0.4.0 #6/#7: typed quantities ("5 ft 3 in",
+            // "1.2 kg") are honoured where a unit family is
+            // known for the field; plain numbers are untouched.
+            nums.push(rigour::parse_field_value(c, idx, t, &flat)?);
         }
         return Ok(nums);
     }
@@ -490,10 +636,7 @@ pub fn expand_args(c: &Calc, toks: &[String]) -> Result<Vec<f64>, String> {
             let Some(tok) = flat.get(pos) else {
                 return Err(format!("'{}' needs more numbers.", c.name));
             };
-            match tok.trim().parse::<f64>() {
-                Ok(v) => nums.push(v),
-                Err(_) => return Err(format!("'{tok}' is not a number.")),
-            }
+            nums.push(rigour::parse_field_value(c, i, tok, &flat)?);
             pos += 1;
             i += 1;
         }
@@ -512,6 +655,10 @@ pub fn expand_args(c: &Calc, toks: &[String]) -> Result<Vec<f64>, String> {
 /// One saved calculation. `inputs` is the human-readable form (dates as
 /// MM/DD/YYYY), `restore` holds one entered token per field separated by
 /// ";;" so the GUI can refill the calculator exactly as it was run.
+/// `tag` and `note` are the lab-notebook annotation (v0.7.0, item
+/// #39); both are empty for ordinary entries. `pinned` is the
+/// log-polish flag (v0.8.0, item #49): a pinned entry is never
+/// dropped by the LOG_CAP trim (the cap counts unpinned entries).
 #[derive(Clone, PartialEq, Debug)]
 pub struct LogEntry {
     pub timestamp: String,
@@ -520,6 +667,33 @@ pub struct LogEntry {
     pub inputs: String,
     pub result: String,
     pub restore: String,
+    pub tag: String,
+    pub note: String,
+    pub pinned: bool,
+}
+
+impl LogEntry {
+    /// An entry with no lab-notebook annotation, not pinned.
+    pub fn plain(
+        timestamp: String,
+        id: String,
+        name: String,
+        inputs: String,
+        result: String,
+        restore: String,
+    ) -> LogEntry {
+        LogEntry {
+            timestamp,
+            id,
+            name,
+            inputs,
+            result,
+            restore,
+            tag: String::new(),
+            note: String::new(),
+            pinned: false,
+        }
+    }
 }
 
 pub const LOG_CAP: usize = 500;
@@ -552,21 +726,33 @@ fn log_unescape(s: &str) -> String {
     out
 }
 
-/// One record per line: timestamp | id | name | inputs | restore | result
-/// (every field escaped, result may contain anything once escaped).
+/// One record per line: timestamp | id | name | inputs | restore |
+/// result, then — since v0.7.0 (#39) — | tag | note (every field
+/// escaped, result may contain anything once escaped). Older files
+/// hold only the first six fields; `parse_entry` accepts both, so
+/// a v0.1.1-era history.txt reads unchanged. Since v0.8.0 (#49) a
+/// PINNED entry carries one more field, "|1"; unpinned entries
+/// serialize byte-identically to the v0.7.0 format, so only lines
+/// for pinned entries use the 9-field shape.
 pub fn serialize_entry(e: &LogEntry) -> String {
-    [
+    let mut line = [
         e.timestamp.as_str(),
         e.id.as_str(),
         e.name.as_str(),
         e.inputs.as_str(),
         e.restore.as_str(),
         e.result.as_str(),
+        e.tag.as_str(),
+        e.note.as_str(),
     ]
     .iter()
     .map(|f| log_escape(f))
     .collect::<Vec<_>>()
-    .join("|")
+    .join("|");
+    if e.pinned {
+        line.push_str("|1");
+    }
+    line
 }
 
 pub fn parse_entry(line: &str) -> Option<LogEntry> {
@@ -589,7 +775,10 @@ pub fn parse_entry(line: &str) -> Option<LogEntry> {
         let _ = chars.peek();
     }
     fields.push(cur);
-    if fields.len() != 6 {
+    // 6 fields = the pre-v0.7.0 format (tag/note default empty);
+    // 8 fields = with the lab-notebook annotation; 9 fields adds
+    // the v0.8.0 pin flag ("1" = pinned).
+    if fields.len() != 6 && fields.len() != 8 && fields.len() != 9 {
         return None;
     }
     let mut it = fields.into_iter().map(|f| log_unescape(&f));
@@ -600,6 +789,9 @@ pub fn parse_entry(line: &str) -> Option<LogEntry> {
         inputs: it.next()?,
         restore: it.next()?,
         result: it.next()?,
+        tag: it.next().unwrap_or_default(),
+        note: it.next().unwrap_or_default(),
+        pinned: it.next().map(|f| f == "1").unwrap_or(false),
     })
 }
 
@@ -646,14 +838,24 @@ pub fn save_history_to(path: &std::path::Path, entries: &[LogEntry]) -> std::io:
     std::fs::write(path, text)
 }
 
-/// Append one entry to the log at `path`, keeping only the most recent
-/// LOG_CAP entries. Returns the full updated list (oldest first).
+/// Append one entry to the log at `path`. The cap (item #49):
+/// at most LOG_CAP UNPINNED entries are kept — when a new entry
+/// would exceed that, the oldest unpinned entries are dropped.
+/// Pinned entries are never dropped by the trim, so the file can
+/// hold LOG_CAP + (number of pins) lines. Returns the full
+/// updated list (oldest first).
 pub fn append_entry_to(path: &std::path::Path, entry: LogEntry) -> std::io::Result<Vec<LogEntry>> {
     let mut entries = load_history_from(path);
     entries.push(entry);
-    if entries.len() > LOG_CAP {
-        let drop = entries.len() - LOG_CAP;
-        entries.drain(0..drop);
+    let mut unpinned = entries.iter().filter(|e| !e.pinned).count();
+    let mut i = 0;
+    while unpinned > LOG_CAP && i < entries.len() {
+        if !entries[i].pinned {
+            entries.remove(i);
+            unpinned -= 1;
+        } else {
+            i += 1;
+        }
     }
     save_history_to(path, &entries)?;
     Ok(entries)
@@ -668,6 +870,61 @@ pub fn clear_history() -> std::io::Result<()> {
     save_history_to(&history_path(), &[])
 }
 
+/// The backup written before every clear (undo for CLEAR LOG):
+/// history-backup.txt beside history.txt in the same folder.
+pub fn history_backup_path() -> std::path::PathBuf {
+    let p = history_path();
+    match p.parent() {
+        Some(dir) => dir.join("history-backup.txt"),
+        None => std::path::PathBuf::from("history-backup.txt"),
+    }
+}
+
+pub fn backup_history_to(path: &std::path::Path) -> std::io::Result<Vec<LogEntry>> {
+    let entries = load_history_from(path);
+    let backup = match path.parent() {
+        Some(dir) => dir.join("history-backup.txt"),
+        None => std::path::PathBuf::from("history-backup.txt"),
+    };
+    save_history_to(&backup, &entries)?;
+    Ok(entries)
+}
+
+/// Clear the log at `path`, first writing its current contents to
+/// the backup file in the same folder (the undo copy).
+pub fn clear_history_with_backup_at(path: &std::path::Path) -> std::io::Result<()> {
+    backup_history_to(path)?;
+    save_history_to(path, &[])
+}
+
+/// Clear the default log, backing it up first (undoable).
+pub fn clear_history_with_backup() -> std::io::Result<()> {
+    clear_history_with_backup_at(&history_path())
+}
+
+/// Undo the last clear: restore the backup into the log at `path`.
+/// Returns the restored entries.
+pub fn restore_history_backup_at(path: &std::path::Path) -> std::io::Result<Vec<LogEntry>> {
+    let backup = match path.parent() {
+        Some(dir) => dir.join("history-backup.txt"),
+        None => std::path::PathBuf::from("history-backup.txt"),
+    };
+    let entries = load_history_from(&backup);
+    save_history_to(path, &entries)?;
+    Ok(entries)
+}
+
+/// Undo the last clear of the default log.
+pub fn restore_history_backup() -> std::io::Result<Vec<LogEntry>> {
+    restore_history_backup_at(&history_path())
+}
+
+/// Whether a non-empty cleared-log backup exists (for the GUI's
+/// RESTORE CLEARED LOG button).
+pub fn history_backup_exists() -> bool {
+    !load_history_from(&history_backup_path()).is_empty()
+}
+
 /// Build a log entry for a successful run.
 pub fn make_entry(c: &Calc, args: &[f64], result: &str) -> LogEntry {
     let toks = display_tokens(c, args);
@@ -678,7 +935,127 @@ pub fn make_entry(c: &Calc, args: &[f64], result: &str) -> LogEntry {
         inputs: toks.join(", "),
         result: result.to_string(),
         restore: toks.join(";;"),
+        tag: String::new(),
+        note: String::new(),
+        pinned: false,
     }
+}
+
+// ---------- lab notebook (v0.7.0, item #39) ----------
+//
+// The calculation log doubles as a lab notebook: any entry can
+// carry a tag and a free-text note (edited in the window's log
+// view, or with the CLI's --log-tag / --log-note). Editing an
+// entry is a change to the user's record, so — the house rule —
+// the current history is first copied to
+// history-edit-backup.txt in the same folder (the same
+// backup-first pattern as CLEAR LOG, a separate file so the two
+// undos never clobber each other).
+
+/// The backup written before every tag/note edit:
+/// history-edit-backup.txt beside the history file.
+pub fn history_edit_backup_path() -> std::path::PathBuf {
+    let p = history_path();
+    match p.parent() {
+        Some(dir) => dir.join("history-edit-backup.txt"),
+        None => std::path::PathBuf::from("history-edit-backup.txt"),
+    }
+}
+
+fn edit_backup_for(path: &std::path::Path) -> std::path::PathBuf {
+    match path.parent() {
+        Some(dir) => dir.join("history-edit-backup.txt"),
+        None => std::path::PathBuf::from("history-edit-backup.txt"),
+    }
+}
+
+/// Set (or, with an empty value, clear) the tag and/or note of one
+/// log entry in the file at `path`. `newest_index` counts from the
+/// newest entry: 0 is the entry `--log` shows first. The file's
+/// current contents are backed up BEFORE the edit (see above).
+/// Returns the updated entry.
+pub fn annotate_entry_at(
+    path: &std::path::Path,
+    newest_index: usize,
+    tag: Option<&str>,
+    note: Option<&str>,
+) -> Result<LogEntry, String> {
+    let mut entries = load_history_from(path);
+    if entries.is_empty() {
+        return Err(
+            "The calculation log is empty — there is no entry to annotate. Run any calculator first."
+                .into(),
+        );
+    }
+    if newest_index >= entries.len() {
+        return Err(format!(
+            "There is no entry #{n} — the log holds {total} entr{ies}. Entry numbers count from the newest, as --log shows them.",
+            n = newest_index + 1,
+            total = entries.len(),
+            ies = if entries.len() == 1 { "y" } else { "ies" }
+        ));
+    }
+    // Backup first (house rule for edits to the record).
+    save_history_to(&edit_backup_for(path), &entries)
+        .map_err(|e| format!("Could not write the pre-edit backup: {e}"))?;
+    let idx = entries.len() - 1 - newest_index;
+    if let Some(t) = tag {
+        entries[idx].tag = t.trim().to_string();
+    }
+    if let Some(n) = note {
+        entries[idx].note = n.trim().to_string();
+    }
+    let updated = entries[idx].clone();
+    save_history_to(path, &entries).map_err(|e| format!("Could not save the log: {e}"))?;
+    Ok(updated)
+}
+
+/// The lab record (item #39): the whole log as one plain-text
+/// document, entries in chronological order (oldest first, the
+/// order they were recorded), each with its tag and note when it
+/// has them. Header states the ordering and that timestamps are
+/// UTC (no timezone database is bundled, as the log itself says).
+pub fn lab_record_text(entries: &[LogEntry]) -> String {
+    let mut out = String::new();
+    out.push_str("CalcDex lab record\n");
+    out.push_str(&format!("Exported: {} (UTC)\n", now_stamp()));
+    out.push_str(&format!(
+        "{} entries, oldest first. Timestamps are UTC.\n",
+        entries.len()
+    ));
+    let tags: Vec<&str> = {
+        let mut t: Vec<&str> = entries
+            .iter()
+            .map(|e| e.tag.as_str())
+            .filter(|t| !t.is_empty())
+            .collect();
+        t.sort();
+        t.dedup();
+        t
+    };
+    if !tags.is_empty() {
+        out.push_str(&format!("Tags used: {}\n", tags.join(", ")));
+    }
+    out.push('\n');
+    for (i, e) in entries.iter().enumerate() {
+        out.push_str(&format!(
+            "{}. {} — {} ({})\n",
+            i + 1,
+            e.timestamp,
+            e.name,
+            e.id
+        ));
+        out.push_str(&format!("   Inputs: {}\n", e.inputs));
+        out.push_str(&format!("   Result: {}\n", e.result.replace('\n', "\n   ")));
+        if !e.tag.is_empty() {
+            out.push_str(&format!("   Tag: {}\n", e.tag));
+        }
+        if !e.note.is_empty() {
+            out.push_str(&format!("   Note: {}\n", e.note.replace('\n', "\n   ")));
+        }
+        out.push('\n');
+    }
+    out
 }
 
 // ---------- statistics helpers ----------
@@ -696,6 +1073,183 @@ pub fn erf(x: f64) -> f64 {
     s * y
 }
 
+// ---------- log polish: search, filter, pin, export (v0.8.0, #49) ----------
+
+/// The log search/filter criteria (item #49). Every field is
+/// optional; an entry must satisfy ALL set fields to match.
+/// `text` is a case-insensitive substring match over the entry's
+/// name, calculator id, inputs, result, tag and note. `date`
+/// matches the entry's recorded day: the timestamp begins
+/// "YYYY-MM-DD", so a "2026-10-25" filter matches that whole day
+/// (a shorter prefix, e.g. "2026-10", matches the month).
+#[derive(Clone, Default, Debug)]
+pub struct LogFilter {
+    pub text: Option<String>,
+    pub calc_id: Option<String>,
+    pub tag: Option<String>,
+    pub date: Option<String>,
+    pub pinned_only: bool,
+}
+
+impl LogFilter {
+    pub fn is_empty(&self) -> bool {
+        self.text.is_none()
+            && self.calc_id.is_none()
+            && self.tag.is_none()
+            && self.date.is_none()
+            && !self.pinned_only
+    }
+
+    pub fn matches(&self, e: &LogEntry) -> bool {
+        if self.pinned_only && !e.pinned {
+            return false;
+        }
+        if let Some(id) = &self.calc_id {
+            if e.id != *id {
+                return false;
+            }
+        }
+        if let Some(tag) = &self.tag {
+            if e.tag.to_lowercase() != tag.trim().to_lowercase() {
+                return false;
+            }
+        }
+        if let Some(date) = &self.date {
+            if !e.timestamp.starts_with(date.trim()) {
+                return false;
+            }
+        }
+        if let Some(text) = &self.text {
+            let q = text.to_lowercase();
+            let hay = format!(
+                "{} {} {} {} {} {}",
+                e.name, e.id, e.inputs, e.result, e.tag, e.note
+            )
+            .to_lowercase();
+            if !hay.contains(&q) {
+                return false;
+            }
+        }
+        true
+    }
+
+    /// A one-line factual description of the criteria, used in
+    /// export headers and result counts.
+    pub fn describe(&self) -> String {
+        let mut parts: Vec<String> = Vec::new();
+        if let Some(t) = &self.text {
+            parts.push(format!("text \"{t}\""));
+        }
+        if let Some(id) = &self.calc_id {
+            parts.push(format!("calculator {id}"));
+        }
+        if let Some(tag) = &self.tag {
+            parts.push(format!("tag \"{tag}\""));
+        }
+        if let Some(d) = &self.date {
+            parts.push(format!("date {d}"));
+        }
+        if self.pinned_only {
+            parts.push("pinned only".to_string());
+        }
+        if parts.is_empty() {
+            "no filter (the whole log)".to_string()
+        } else {
+            parts.join(", ")
+        }
+    }
+}
+
+/// The entries matching `filter`, each paired with its GLOBAL
+/// entry number — the number `--log` shows for it (1 = newest) —
+/// in the log's stored order (oldest first). Callers reverse for
+/// newest-first display; the global numbers keep --log-pin /
+/// --log-tag / --log-note unambiguous from a filtered view.
+pub fn filter_entries<'a>(
+    entries: &'a [LogEntry],
+    filter: &LogFilter,
+) -> Vec<(usize, &'a LogEntry)> {
+    let total = entries.len();
+    entries
+        .iter()
+        .enumerate()
+        .filter(|(_, e)| filter.matches(e))
+        .map(|(i, e)| (total - i, e))
+        .collect()
+}
+
+/// The filtered log export (item #49): the matching entries as
+/// one plain-text document, oldest first (the order they were
+/// recorded), with the filter stated in the header, the pin mark
+/// shown, and the timestamps-are-UTC note the log always carries.
+pub fn log_export_text(entries: &[LogEntry], filter: &LogFilter) -> String {
+    let matched = filter_entries(entries, filter);
+    let mut out = String::new();
+    out.push_str("CalcDex calculation log export\n");
+    out.push_str(&format!("Exported: {} (UTC)\n", now_stamp()));
+    out.push_str(&format!(
+        "Filter: {}. {} of {} entries match, oldest first. Timestamps are UTC.\n\n",
+        filter.describe(),
+        matched.len(),
+        entries.len()
+    ));
+    for (num, e) in &matched {
+        out.push_str(&format!(
+            "#{} {} — {} ({}){}\n",
+            num,
+            e.timestamp,
+            e.name,
+            e.id,
+            if e.pinned { " [pinned]" } else { "" }
+        ));
+        out.push_str(&format!("   Inputs: {}\n", e.inputs));
+        out.push_str(&format!("   Result: {}\n", e.result.replace('\n', "\n   ")));
+        if !e.tag.is_empty() {
+            out.push_str(&format!("   Tag: {}\n", e.tag));
+        }
+        if !e.note.is_empty() {
+            out.push_str(&format!("   Note: {}\n", e.note.replace('\n', "\n   ")));
+        }
+        out.push('\n');
+    }
+    out
+}
+
+/// Pin or unpin one log entry in the file at `path` (item #49).
+/// `newest_index` counts from the newest entry, exactly like
+/// `annotate_entry_at`. The file's current contents are backed up
+/// BEFORE the edit, to the same history-edit-backup.txt the
+/// tag/note edits use (the house backup-first rule). Returns the
+/// updated entry.
+pub fn set_entry_pinned_at(
+    path: &std::path::Path,
+    newest_index: usize,
+    pinned: bool,
+) -> Result<LogEntry, String> {
+    let mut entries = load_history_from(path);
+    if entries.is_empty() {
+        return Err(
+            "The calculation log is empty — there is no entry to pin. Run any calculator first."
+                .into(),
+        );
+    }
+    if newest_index >= entries.len() {
+        return Err(format!(
+            "There is no entry #{n} — the log holds {total} entr{ies}. Entry numbers count from the newest, as --log shows them.",
+            n = newest_index + 1,
+            total = entries.len(),
+            ies = if entries.len() == 1 { "y" } else { "ies" }
+        ));
+    }
+    save_history_to(&edit_backup_for(path), &entries)
+        .map_err(|e| format!("Could not write the pre-edit backup: {e}"))?;
+    let idx = entries.len() - 1 - newest_index;
+    entries[idx].pinned = pinned;
+    let updated = entries[idx].clone();
+    save_history_to(path, &entries).map_err(|e| format!("Could not save the log: {e}"))?;
+    Ok(updated)
+}
+
 /// Standard normal CDF Phi(z).
 pub fn norm_cdf(z: f64) -> f64 {
     0.5 * (1.0 + erf(z / std::f64::consts::SQRT_2))
@@ -704,6 +1258,29 @@ pub fn norm_cdf(z: f64) -> f64 {
 /// Two-sided p-value for a z statistic.
 pub fn p_from_z(z: f64) -> f64 {
     2.0 * (1.0 - norm_cdf(z.abs()))
+}
+
+/// Two-sided 95% critical value of Student's t distribution for
+/// `df` degrees of freedom (v0.7.0 #33): the standard published
+/// table for df 1–30; beyond 30 the normal value 1.96 is used
+/// (the t distribution has effectively become the normal there —
+/// at df 30 the exact value is 2.042, at df 120 it is 1.980, so
+/// the 1.96 step at df 31 is a documented approximation, also
+/// stated in DECISIONS.md).
+pub fn t_crit_95(df: usize) -> f64 {
+    const TABLE: [f64; 30] = [
+        12.706, 4.303, 3.182, 2.776, 2.571, 2.447, 2.365, 2.306, 2.262, 2.228, 2.201, 2.179, 2.160,
+        2.145, 2.131, 2.120, 2.110, 2.101, 2.093, 2.086, 2.080, 2.074, 2.069, 2.064, 2.060, 2.056,
+        2.052, 2.048, 2.045, 2.042,
+    ];
+    if df == 0 {
+        return f64::NAN;
+    }
+    if df <= 30 {
+        TABLE[df - 1]
+    } else {
+        1.96
+    }
 }
 
 /// Factorial for non-negative integers up to 170.
