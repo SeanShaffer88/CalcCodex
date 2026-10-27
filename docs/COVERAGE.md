@@ -87,3 +87,20 @@ MM/DD/YYYY fields with named date groups (Birth Date, End Date, Start
 Date, From Date, Target Date, Date, First Day of Last Period), adds
 Today? buttons and CLI one-argument dates, and adds the shared
 GUI+CLI calculation log.
+
+## v0.8.0 note (2026-10-26)
+
+Registry now 316 calculators in the same 14 categories (from
+the built binary's own `--list` output). Per-category counts:
+Math 62, Conversion 36, Physics 34, Finance 34, Construction
+30, Chemistry 24, Statistics 24, Health 24, Everyday 15,
+Sports 7, Food 7, Ecology 7, Date & Time 7, Other 5. The
+v0.7.0 scientists batch added Replicates Summary and Outlier
+Check (Statistics) and Serial Dilution (Chemistry); v0.8.0
+adds the electronics pack to Physics (Resistor Colour Code,
+Resistors in Series & Parallel, Voltage Divider) and the
+mechanical pack to Construction (Tolerance Stack-Up, Safety
+Factor & Margin of Safety, Bolt Torque, Beam — Stress &
+Deflection). The materials table (#44) is reference data
+served by `--materials` and the MATERIALS view, not a
+calculator, so it does not change the count.

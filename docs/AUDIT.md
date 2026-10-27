@@ -279,3 +279,48 @@ computed by hand (m = 0.6, b = 2.2, r = 0.7746, R² = 0.6); the CSV
 parser has quoted-comma cases in tests. GUI panels are
 construction-verified only — on-Windows behaviour is Unverified
 until a field run, same label as v0.2.0.
+
+## v0.4.0 addendum — typed-input coverage (#6/#7) and new calculators
+
+Typed quantities are accepted ONLY where the registry carries
+unit metadata for the field — the coverage below is exact, from
+`meta::UNIT_INFO` + the converter constructors, and a test pins
+that the metadata lengths match each calculator's input count:
+
+- **Every converter** (Conversion category, incl. the five new
+  compound converters): the value field converts a typed
+  quantity into the chosen FROM unit; the dimension is the
+  converter's family (length, mass, area, volume, speed, time,
+  pressure, energy, power, force, density, frequency, data,
+  torque, illuminance, flow, temperature).
+- **Physics:** speed / distance / time, average velocity,
+  acceleration, final velocity, force, weight-on-earth, kinetic
+  / potential / mechanical energy, physics power, work,
+  density, pressure, Ohm's law (all three solve forms),
+  electrical power, resistors in parallel, projectile, pendulum,
+  wave, torque, momentum, friction, Hooke's law, gravity force,
+  centripetal acceleration, free fall.
+- **Health:** BMI (metric + imperial), BMR (male/female,
+  Harris–Benedict variants), water intake, protein needs.
+
+Everything else — all list calculators and every field without
+metadata — keeps plain-number entry, by design: a dimension is
+only ever checked when it is known, never guessed. Plain numbers
+never trigger the dimensional warning.
+
+New calculators at v0.4.0 (306 total): Expression Calculator
+(example `2*(3+4)^2` = 98; parser tests cover precedence,
+right-associative ^, nested functions, degree/radian trig and
+error positions) and the five compound converters of #8, each
+with a hand-computed vector (density 1000 kg/m³ = 1 g/cm³;
+fuel 8 L/100km = 29.401823 mpg US from 235.214583/8; data rate
+100 Mbps = 12,500 KB/s; concentration 1 % w/v = 10 mg/mL;
+energy density 3.6 MJ/m³ = 1 kWh/m³). Their defaults are their
+examples, per the #50 policy.
+
+Bug found and fixed during the v0.4.0 build: window startup
+validated the shared settings file against the category-name
+set instead of the calculator-id set (the CLI used the right
+set). Window-loaded favourites/remembered inputs were therefore
+checked against the wrong list. Fixed in `App::new`; a settings
+round-trip test against the real id set pins it.
