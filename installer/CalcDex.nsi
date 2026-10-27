@@ -1,7 +1,7 @@
 ; CalcDex installer — per-user, no admin needed.
 Unicode true
 Name "CalcDex"
-OutFile "CalcDex-Setup-0.3.0.exe"
+OutFile "CalcDex-Setup-0.8.0.exe"
 InstallDir "$LOCALAPPDATA\Programs\CalcDex"
 RequestExecutionLevel user
 Icon "..\assets\icon.ico"
@@ -22,7 +22,7 @@ Section "Install"
   WriteUninstaller "$INSTDIR\Uninstall.exe"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\CalcDex" "DisplayName" "CalcDex"
   WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\CalcDex" "UninstallString" "$INSTDIR\Uninstall.exe"
-  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\CalcDex" "DisplayVersion" "0.3.0"
+  WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\CalcDex" "DisplayVersion" "0.8.0"
 SectionEnd
 
 Section "Uninstall"

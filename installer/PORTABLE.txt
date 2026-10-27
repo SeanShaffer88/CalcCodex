@@ -1,6 +1,8 @@
 CalcDex — portable build
 
-Just run CalcDex.exe. Nothing is installed and no internet is used.
+Just run CalcDex.exe. Nothing is installed. No internet is used
+unless you press Check for updates in the HELP panel (or switch on
+the startup update check there — it is off by default).
 Delete the folder to remove it. The one thing the program writes is its
 calculation log: every successful calculation is saved automatically to
 %APPDATA%\CalcDex\history.txt (view it with the LOG button, or with
