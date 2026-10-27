@@ -382,4 +382,88 @@ pub fn register(v: &mut Vec<Calc>) {
             },
         ),
     );
+    // v0.7.0 (#35): serial dilution planner. Two modes, picked
+    // by the mode field like the other code fields in this
+    // registry: 1 = each step moves a transfer volume into a
+    // diluent volume (factor = (transfer + diluent) / transfer);
+    // 2 = a plain dilution factor per step (10 = 1:10).
+    reg(
+        v,
+        Calc::new(
+            "serial-dilution",
+            "Serial Dilution Planner",
+            "Chemistry",
+            "Plans a serial dilution: every step dilutes by the same factor, so step k has concentration = start / factor^k. Mode 1: the factor comes from the volumes — (transfer + diluent) / transfer. Mode 2: enter the factor directly (10 for a 1:10 series). Concentrations are printed in the same unit as the starting concentration; volumes share one unit.",
+            &[
+                "Starting concentration",
+                "Mode (1 = volumes, 2 = factor)",
+                "Transfer volume (mode 1)",
+                "Diluent volume (mode 1)",
+                "Dilution factor per step (mode 2)",
+                "Number of steps",
+            ],
+            |x| {
+                let start = a(x, 0);
+                chk(
+                    start > 0.0,
+                    "The starting concentration must be over 0.",
+                )?;
+                let mode = a(x, 1);
+                let factor = if mode == 1.0 {
+                    let (tr, dil) = (a(x, 2), a(x, 3));
+                    chk(
+                        tr > 0.0,
+                        "Mode 1 needs a transfer volume over 0 — it is the volume moved into each new tube.",
+                    )?;
+                    chk(
+                        dil > 0.0,
+                        "Mode 1 needs a diluent volume over 0 — with no diluent there is no dilution. For a plain factor per step, use mode 2.",
+                    )?;
+                    (tr + dil) / tr
+                } else if mode == 2.0 {
+                    let f = a(x, 4);
+                    chk(
+                        f > 1.0,
+                        "Mode 2 needs a dilution factor over 1 — 10 means each step is 1 part sample in 10 parts total. A factor of 1 would not dilute at all.",
+                    )?;
+                    f
+                } else {
+                    return Err(
+                        "Mode must be 1 (transfer + diluent volumes) or 2 (dilution factor per step)."
+                            .into(),
+                    );
+                };
+                let steps = a(x, 5);
+                chk(
+                    steps >= 1.0 && steps == steps.trunc() && steps <= 100.0,
+                    "The number of steps must be a whole number from 1 to 100.",
+                )?;
+                let how = if mode == 1.0 {
+                    format!(
+                        "transfer {} + diluent {} = {} in total",
+                        n(a(x, 2)),
+                        n(a(x, 3)),
+                        n(a(x, 2) + a(x, 3))
+                    )
+                } else {
+                    "the factor you entered".to_string()
+                };
+                let mut out = format!(
+                    "Serial dilution: each step divides the concentration by {} ({}).\nStart: {}.",
+                    nd(factor, 6),
+                    how,
+                    n(start)
+                );
+                let mut c = start;
+                for i in 1..=(steps as usize) {
+                    c /= factor;
+                    out.push_str(&format!("\nStep {i}: {}.", n(c)));
+                }
+                out.push_str(
+                    "\nConcentrations are in the same unit as the starting concentration; volumes in one shared unit.",
+                );
+                Ok(out)
+            },
+        ),
+    );
 }

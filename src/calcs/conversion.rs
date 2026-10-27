@@ -15,6 +15,7 @@ fn linear(
     id: &'static str,
     name: &'static str,
     hint: &'static str,
+    family: &'static str,
     units: &'static [(&'static str, f64)],
 ) {
     let table = units
@@ -28,6 +29,13 @@ fn linear(
             "Convert {hint}. Inputs: value, FROM unit number, TO unit number. Units: {table}. Formula: result = value x factor(from) / factor(to)."
         )
         .into_boxed_str(),
+    );
+    let unit_names: &'static [&'static str] = Box::leak(
+        units
+            .iter()
+            .map(|(u, _)| *u)
+            .collect::<Vec<_>>()
+            .into_boxed_slice(),
     );
     reg(
         v,
@@ -70,7 +78,13 @@ fn linear(
                     nd(r, 8)
                 ))
             },
-        ),
+        )
+        .with_unit_info(
+            Box::leak(vec![family, "", ""].into_boxed_slice()),
+            &["", "", ""],
+            Box::leak(vec![family, "", ""].into_boxed_slice()),
+        )
+        .with_converter_units(unit_names),
     );
 }
 
@@ -79,6 +93,7 @@ pub fn register(v: &mut Vec<Calc>) {
         v,
         "convert-length",
         "Length Converter",
+        "length",
         "length",
         &[
             ("millimetres", 0.001),
@@ -100,6 +115,7 @@ pub fn register(v: &mut Vec<Calc>) {
         "convert-mass",
         "Mass / Weight Converter",
         "mass",
+        "mass",
         &[
             ("milligrams", 0.001),
             ("grams", 1.0),
@@ -117,6 +133,7 @@ pub fn register(v: &mut Vec<Calc>) {
         "convert-area",
         "Area Converter",
         "area",
+        "area",
         &[
             ("square metres", 1.0),
             ("square centimetres", 0.0001),
@@ -133,6 +150,7 @@ pub fn register(v: &mut Vec<Calc>) {
         v,
         "convert-volume",
         "Volume Converter",
+        "volume",
         "volume",
         &[
             ("millilitres", 0.001),
@@ -156,6 +174,7 @@ pub fn register(v: &mut Vec<Calc>) {
         "convert-speed",
         "Speed Converter",
         "speed",
+        "speed",
         &[
             ("m/s", 1.0),
             ("km/h", 1.0 / 3.6),
@@ -169,6 +188,7 @@ pub fn register(v: &mut Vec<Calc>) {
         v,
         "convert-time",
         "Time Converter",
+        "time",
         "time",
         &[
             ("milliseconds", 0.001),
@@ -185,6 +205,7 @@ pub fn register(v: &mut Vec<Calc>) {
         "convert-data",
         "Data Storage Converter",
         "data size (decimal SI: 1 KB = 1000 bytes; binary values are separate units)",
+        "",
         &[
             ("bytes", 1.0),
             ("KB (1000 B)", 1e3),
@@ -203,6 +224,7 @@ pub fn register(v: &mut Vec<Calc>) {
         "convert-pressure",
         "Pressure Converter",
         "pressure",
+        "pressure",
         &[
             ("pascals", 1.0),
             ("kilopascals", 1000.0),
@@ -217,6 +239,7 @@ pub fn register(v: &mut Vec<Calc>) {
         v,
         "convert-energy",
         "Energy Converter",
+        "energy",
         "energy",
         &[
             ("joules", 1.0),
@@ -234,6 +257,7 @@ pub fn register(v: &mut Vec<Calc>) {
         "convert-power-units",
         "Power Converter",
         "power",
+        "power",
         &[
             ("watts", 1.0),
             ("kilowatts", 1000.0),
@@ -246,6 +270,7 @@ pub fn register(v: &mut Vec<Calc>) {
         v,
         "convert-force-units",
         "Force Converter",
+        "force",
         "force",
         &[
             ("newtons", 1.0),
@@ -260,6 +285,7 @@ pub fn register(v: &mut Vec<Calc>) {
         "convert-torque-units",
         "Torque Converter",
         "torque",
+        "",
         &[
             ("newton-metres", 1.0),
             ("foot-pounds", 1.3558179483314),
@@ -271,6 +297,7 @@ pub fn register(v: &mut Vec<Calc>) {
         v,
         "convert-density-units",
         "Density Converter",
+        "density",
         "density",
         &[
             ("kg/m^3", 1.0),
@@ -285,6 +312,7 @@ pub fn register(v: &mut Vec<Calc>) {
         "convert-frequency",
         "Frequency Converter",
         "frequency",
+        "frequency",
         &[
             ("hertz", 1.0),
             ("kilohertz", 1e3),
@@ -298,6 +326,7 @@ pub fn register(v: &mut Vec<Calc>) {
         "convert-flow",
         "Flow Rate Converter",
         "volume flow",
+        "",
         &[
             ("litres/second", 1.0),
             ("litres/minute", 1.0 / 60.0),
@@ -311,6 +340,7 @@ pub fn register(v: &mut Vec<Calc>) {
         "convert-illuminance",
         "Illuminance Converter",
         "light",
+        "",
         &[("lux", 1.0), ("foot-candles", 10.7639), ("phot", 10000.0)],
     );
     // Temperature — special (offset) formulas, unit numbers: 0=C, 1=F, 2=K.
@@ -322,7 +352,9 @@ pub fn register(v: &mut Vec<Calc>) {
             let c = match f { 0 => a(x,0), 1 => (a(x,0)-32.0)*5.0/9.0, 2 => a(x,0)-273.15, _ => return Err("From-unit must be 0, 1 or 2.".into()) };
             let (r, name) = match t { 0 => (c, "Celsius"), 1 => (c*9.0/5.0+32.0, "Fahrenheit"), 2 => (c+273.15, "Kelvin"), _ => return Err("To-unit must be 0, 1 or 2.".into()) };
             Ok(format!("Result: {} {}. (Via Celsius: {} C.)", nd(r,4), name, nd(c,4)))
-        }));
+        })
+        .with_unit_info(&["temperature", "", ""], &["Celsius", "", ""], &["temperature", "", ""])
+        .with_converter_units(&["Celsius", "Fahrenheit", "Kelvin"]));
     // Fuel economy — inverse relationship, dedicated calc.
     reg(v, Calc::new("convert-fuel-economy", "Fuel Economy Converter (mpg <-> L/100km)", "Conversion",
         "US mpg and L/100km are inverses: L/100km = 235.215 / mpg(US). UK mpg = 282.481 / (L/100km). Enter a US-mpg value OR an L/100km value — the other input 0 is ignored (give exactly one).", &["US mpg (or 0)", "L/100km (or 0)"],
@@ -330,6 +362,88 @@ pub fn register(v: &mut Vec<Calc>) {
             if a(x,0) > 0.0 && a(x,1) == 0.0 { return Ok(format!("{} US mpg = {} L/100km = {} UK mpg.", nd(a(x,0),3), nd(235.215/a(x,0),3), nd(a(x,0)*1.20095,2))); }
             if a(x,1) > 0.0 && a(x,0) == 0.0 { return Ok(format!("{} L/100km = {} US mpg = {} UK mpg.", nd(a(x,1),3), nd(235.215/a(x,1),3), nd(282.481/a(x,1),2))); }
             Err("Give exactly one of the two values (the other must be 0).".into())
+        }));
+
+    // ---- v0.4.0 (#8): compound-unit converters ----
+    linear(
+        v,
+        "compound-density",
+        "Density Converter (Compound Units)",
+        "density (mass per volume)",
+        "density",
+        &[
+            ("kg/m^3", 1.0),
+            ("g/cm^3", 1000.0),
+            ("g/mL", 1000.0),
+            ("kg/L", 1000.0),
+            ("g/L", 1.0),
+            ("lb/ft^3", 16.018463),
+            ("lb/gal (US)", 119.8264),
+        ],
+    );
+    linear(
+        v,
+        "compound-data-rate",
+        "Data Rate Converter (Compound Units)",
+        "data rate (bits and bytes per second; 1 byte = 8 bits)",
+        "",
+        &[
+            ("bit/s", 1.0e-6),
+            ("Kbit/s", 0.001),
+            ("Mbit/s (Mbps)", 1.0),
+            ("Gbit/s", 1000.0),
+            ("KB/s", 0.008),
+            ("MB/s", 8.0),
+            ("GB/s", 8000.0),
+            ("KiB/s", 0.008192),
+            ("MiB/s", 8.388608),
+            ("GiB/s", 8589.934592),
+        ],
+    );
+    linear(
+        v,
+        "compound-concentration",
+        "Concentration Converter (Compound Units)",
+        "concentration (mass per volume; % w/v = grams per 100 mL, ppm here = mg/L)",
+        "",
+        &[
+            ("mg/mL", 1.0),
+            ("g/L", 1.0),
+            ("kg/m^3", 1.0),
+            ("% w/v", 10.0),
+            ("ppm (mg/L)", 0.001),
+            ("\u{b5}g/mL", 0.001),
+            ("g/mL", 1000.0),
+        ],
+    );
+    linear(
+        v,
+        "compound-energy-density",
+        "Energy Density Converter (Compound Units)",
+        "energy per volume (dimensionally the same as pressure: 1 J/m^3 = 1 Pa)",
+        "",
+        &[
+            ("J/m^3", 1.0),
+            ("kJ/m^3", 1000.0),
+            ("MJ/m^3", 1.0e6),
+            ("kWh/m^3", 3.6e6),
+            ("J/L", 1000.0),
+            ("kJ/L", 1.0e6),
+            ("BTU/ft^3", 37258.9),
+        ],
+    );
+    // Fuel consumption — inverse relationships, dedicated calc (#8).
+    reg(v, Calc::new("compound-fuel-consumption", "Fuel Consumption Converter (Compound Units)", "Conversion",
+        "Compound fuel-consumption units are inverses: L/100km = 235.214583 / mpg (US) = 282.480936 / mpg (UK); km/L = 100 / (L/100km). Inputs: value, FROM unit number, TO unit number. Units: 0=L/100km, 1=mpg (US), 2=mpg (UK), 3=km/L.", &["Value", "From unit (number from list)", "To unit (number from list)"],
+        |x| {
+            chk(a(x,0) > 0.0, "Fuel consumption must be over 0 (these units are inverses — 0 and negatives have no conversion).")?;
+            chk(a(x,1)==(a(x,1) as i64) as f64 && a(x,2)==(a(x,2) as i64) as f64, "Unit numbers must be whole numbers: 0, 1, 2 or 3.")?;
+            let f = a(x,1) as i64; let t = a(x,2) as i64;
+            let names = ["L/100km", "mpg (US)", "mpg (UK)", "km/L"];
+            chk((0..=3).contains(&f) && (0..=3).contains(&t), "Unit number is out of range — use 0, 1, 2 or 3 from the list in the description.")?;
+            let l100 = match f { 0 => a(x,0), 1 => 235.214583/a(x,0), 2 => 282.480936/a(x,0), _ => 100.0/a(x,0) };
+            let r = match t { 0 => l100, 1 => 235.214583/l100, 2 => 282.480936/l100, _ => 100.0/l100 };
+            Ok(format!("{} {} = {} {}.\nSteps: via L/100km = {}.", nd(a(x,0),6), names[f as usize], nd(r,6), names[t as usize], nd(l100,6)))
         }));
     // Cooking: grams <-> cups by ingredient density (g per US cup, standard published table values).
     let ingredients: &[(&str, &str, f64)] = &[

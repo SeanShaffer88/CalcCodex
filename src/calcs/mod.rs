@@ -1,6 +1,7 @@
 pub mod chemistry;
 pub mod construction;
 pub mod conversion;
+pub mod engineering;
 pub mod everyday;
 pub mod finance;
 pub mod health;

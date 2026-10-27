@@ -1,4 +1,7 @@
 //! Math calculators (Omni: Math; Nutilz calculator subset).
+use crate::rigour::{
+    eval_expression, eval_expression_uncertain, format_uncertain, has_uncertainty, AngleMode,
+};
 use crate::{a, chk, factorial, finite, gcd_i, n, nd, nz, Calc};
 use std::f64::consts::PI;
 
@@ -7,6 +10,61 @@ fn reg(v: &mut Vec<Calc>, c: Calc) {
 }
 
 pub fn register(v: &mut Vec<Calc>) {
+    // v0.4.0 (#5): free expression calculator with a hand-written
+    // parser (src/rigour.rs). Text-input calculator: its runs are
+    // appended to the same calculation log as every other run —
+    // the log is its paper tape.
+    reg(
+        v,
+        Calc::new(
+            "expression-calculator",
+            "Expression Calculator",
+            "Math",
+            "Type a free expression: + - * / ^ and brackets; functions sin cos tan asin acos atan sqrt ln log10 exp abs; constants pi, e, tau and the CODATA library (c, h, k_b, n_a, ... — CalcDex --constants lists them, and your own --define constants work too). A measurement written 10 \u{b1} 0.2 (or 10 +/- 0.2) carries its uncertainty through the whole expression. Angle mode (degrees or radians) is chosen beside the field in the window, or with --degrees / --radians on the command line (CalcDex expr \"2*(3+4)^2\").",
+            &["Expression (text)"],
+            |_| Err("This calculator takes an expression as text, not numbers.".into()),
+        )
+        .text_mode("2*(3+4)^2", |text, degrees| {
+            let mode = if degrees {
+                AngleMode::Degrees
+            } else {
+                AngleMode::Radians
+            };
+            if has_uncertainty(text) {
+                let o = eval_expression_uncertain(text, mode)?;
+                let mut out = format!(
+                    "Result: {}.\nExpression: {}.\nUncertainty propagation (first-order lab rules):",
+                    format_uncertain(&o),
+                    text.trim()
+                );
+                for s in &o.steps {
+                    out.push_str(&format!("\n{s}"));
+                }
+                out.push_str(&format!(
+                    "\nAngle mode: {} (sin/cos/tan{}).",
+                    if degrees { "degrees" } else { "radians" },
+                    if degrees {
+                        " take degrees; asin/acos/atan answer in degrees"
+                    } else {
+                        " take radians; asin/acos/atan answer in radians"
+                    }
+                ));
+                return Ok(out);
+            }
+            let value = eval_expression(text, mode)?;
+            Ok(format!(
+                "Result: {}.\nExpression: {}.\nAngle mode: {} (sin/cos/tan{}).",
+                crate::n_full(value),
+                text.trim(),
+                if degrees { "degrees" } else { "radians" },
+                if degrees {
+                    " take degrees; asin/acos/atan answer in degrees"
+                } else {
+                    " take radians; asin/acos/atan answer in radians"
+                }
+            ))
+        }),
+    );
     // ---- Percentages ----
     reg(
         v,

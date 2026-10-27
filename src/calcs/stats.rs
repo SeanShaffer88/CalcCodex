@@ -276,4 +276,99 @@ pub fn register(v: &mut Vec<Calc>) {
             }
             Ok(out)
         }).pair_tail_mode());
+    // v0.7.0 (#33): replicates summary — the lab one-step answer
+    // for repeated measurements of the same quantity.
+    reg(
+        v,
+        Calc::new(
+            "replicates-summary",
+            "Replicates Summary (Mean, SD, SEM, 95% CI)",
+            "Statistics",
+            "For repeated measurements of the same thing: the mean, the sample standard deviation (SD), the standard error of the mean (SEM = SD / sqrt(n)) and the 95% confidence interval for the mean = mean +- t x SEM, with t from Student's t table at n - 1 degrees of freedom (table for df 1-30; the normal value 1.96 beyond df 30). Needs at least 2 values.",
+            &["Measured values (list, at least 2)"],
+            |x| {
+                if x.len() < 2 {
+                    return Err("Replicates summary needs at least 2 measurements of the same thing.".into());
+                }
+                let mu = mean(x);
+                let var = x.iter().map(|y| (y - mu).powi(2)).sum::<f64>() / (x.len() - 1) as f64;
+                let sd = var.sqrt();
+                let sem = sd / (x.len() as f64).sqrt();
+                let t = crate::t_crit_95(x.len() - 1);
+                let moe = t * sem;
+                Ok(format!(
+                    "Replicates: n = {}. Mean = {}. Sample SD = {}. SEM = {}. 95% confidence interval: {} to {} (mean \u{b1} {}). Steps: SD = sqrt( sum of (value - mean)^2 / (n - 1) ) = {}. SEM = SD / sqrt(n) = {} / {} = {}. Margin = t({}) x SEM = {} x {} = {}.",
+                    x.len(),
+                    nd(mu, 6),
+                    nd(sd, 6),
+                    nd(sem, 6),
+                    nd(mu - moe, 6),
+                    nd(mu + moe, 6),
+                    nd(moe, 6),
+                    nd(sd, 6),
+                    nd(sd, 6),
+                    nd((x.len() as f64).sqrt(), 6),
+                    nd(sem, 6),
+                    x.len() - 1,
+                    nd(t, 3),
+                    nd(sem, 6),
+                    nd(moe, 6)
+                ))
+            },
+        )
+        .list_mode(),
+    );
+    // v0.7.0 (#36): outlier check by the 1.5 x IQR rule, with
+    // quartiles by the median-of-halves (Tukey) method.
+    reg(
+        v,
+        Calc::new(
+            "outlier-check",
+            "Outlier Check (IQR Rule)",
+            "Statistics",
+            "Flags values that fall outside the fences Q1 - 1.5 x IQR and Q3 + 1.5 x IQR (the standard Tukey rule). Q1 and Q3 are the medians of the lower and upper halves of the sorted values. Needs at least 4 values.",
+            &["Values (list, at least 4)"],
+            |x| {
+                if x.len() < 4 {
+                    return Err("Outlier check needs at least 4 values — it compares the middle half of the data with the rest.".into());
+                }
+                let s = sorted(x);
+                let med = median(x);
+                let mid = s.len() / 2;
+                let (lower, upper) = if s.len() % 2 == 1 {
+                    (&s[..mid], &s[mid + 1..])
+                } else {
+                    (&s[..mid], &s[mid..])
+                };
+                let q1 = median(lower);
+                let q3 = median(upper);
+                let iqr = q3 - q1;
+                let lo = q1 - 1.5 * iqr;
+                let hi = q3 + 1.5 * iqr;
+                let flagged: Vec<f64> =
+                    s.iter().copied().filter(|val| *val < lo || *val > hi).collect();
+                let mut out = format!(
+                    "Sorted: {}. Q1 = {}. Median = {}. Q3 = {}. IQR = {} (Q3 - Q1). Fences: below {} or above {} (Q1 - 1.5 x IQR, Q3 + 1.5 x IQR).",
+                    s.iter().map(|y| n(*y)).collect::<Vec<_>>().join(", "),
+                    nd(q1, 6),
+                    nd(med, 6),
+                    nd(q3, 6),
+                    nd(iqr, 6),
+                    nd(lo, 6),
+                    nd(hi, 6)
+                );
+                if flagged.is_empty() {
+                    out.push_str(" Outliers: none — every value lies inside the fences.");
+                } else {
+                    out.push_str(&format!(
+                        " Outliers ({}): {}.",
+                        flagged.len(),
+                        flagged.iter().map(|y| n(*y)).collect::<Vec<_>>().join(", ")
+                    ));
+                }
+                Ok(out)
+            },
+        )
+        .list_mode(),
+    );
 }
