@@ -53,8 +53,18 @@ fn sig_figs_annotation_keeps_full_precision_and_dates() {
 #[test]
 fn every_calculator_has_a_working_example() {
     let calcs = all_calcs();
-    assert_eq!(calcs.len(), 300, "299 + linear regression");
+    assert_eq!(
+        calcs.len(),
+        316,
+        "300 + expression + 5 compound converters (v0.4.0) + replicates/outlier/serial-dilution (v0.7.0) + the engineering seven (v0.8.0)"
+    );
     for c in &calcs {
+        if c.text_run.is_some() {
+            // Text calculator (v0.4.0 #5): its example is text.
+            assert!(!c.example_text.is_empty(), "{} has no text example", c.id);
+            assert!(calcdex::run_text_calc(c.id, c.example_text, true).is_ok());
+            continue;
+        }
         assert!(
             !c.example.is_empty(),
             "{} has no example inputs (item #11)",
@@ -119,6 +129,9 @@ fn every_input_has_a_hint() {
 #[test]
 fn defaults_exist_and_run() {
     for c in all_calcs() {
+        if c.text_run.is_some() {
+            continue; // text calculator: its default is its example text
+        }
         let d = defaults_for(&c);
         assert!(!d.is_empty(), "{} has no defaults", c.id);
         assert!(run_calc(c.id, d).is_ok(), "{} defaults fail", c.id);
@@ -237,7 +250,11 @@ fn synonym_search_finds_everyday_terms() {
 fn settings_round_trip_and_safety() {
     let valid: BTreeSet<String> = all_calcs().iter().map(|c| c.id.to_string()).collect();
     let mut s = Settings {
-        sig_figs: Some(3),
+        display: calcdex::rigour::DisplayFormat {
+            mode: calcdex::rigour::DisplayMode::SigFigs,
+            n: Some(3),
+            rounding: calcdex::rigour::RoundingMode::HalfUp,
+        },
         ..Default::default()
     };
     s.toggle_favourite("bmi");
@@ -251,10 +268,10 @@ fn settings_round_trip_and_safety() {
     assert_eq!(back.recent[0], "age");
     // Unknown ids are dropped, junk lines ignored, nothing panics.
     let junk = parse_settings(
-        "sig_figs=banana\nfavourite=no-such-calc\ninputs.ghost=1;;2\n???\ninputs.bmi=70;;175\n",
+        "sig_figs=banana\ndisplay_format=banana\nrounding=banana\nfavourite=no-such-calc\ninputs.ghost=1;;2\n???\ninputs.bmi=70;;175\n",
         &valid,
     );
-    assert_eq!(junk.sig_figs, None);
+    assert_eq!(junk.display.mode, calcdex::rigour::DisplayMode::Off);
     assert!(junk.favourites.is_empty());
     assert_eq!(
         junk.remembered.get("bmi").unwrap(),

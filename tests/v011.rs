@@ -159,6 +159,9 @@ fn log_append_read_cap_and_restore_round_trip() {
         inputs: "25, 200".into(),
         result: "line one\nline two \\ with | pipes".into(),
         restore: "25;;200".into(),
+        tag: String::new(),
+        note: String::new(),
+        pinned: false,
     };
     append_entry_to(&path, tricky.clone()).unwrap();
     let read_back = load_history_from(&path);
@@ -176,6 +179,9 @@ fn log_append_read_cap_and_restore_round_trip() {
             inputs: "1, 2".into(),
             result: "ok".into(),
             restore: "1;;2".into(),
+            tag: String::new(),
+            note: String::new(),
+            pinned: false,
         });
     }
     save_history_to(&big, &many[..500]).unwrap();
